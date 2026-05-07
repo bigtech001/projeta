@@ -1,0 +1,131 @@
+Crie um software moderno de projeção para igrejas inspirado em:
+- Louvor JA
+- Holyrics
+- ProPresenter
+- EasyWorship
+
+Stack obrigatória:
+- Frontend: React + Next.js + Tailwind
+- Backend: Node.js
+- Banco: SQLite
+- Desktop: Electron
+- Player de áudio HTML5
+- Comunicação em tempo real via WebSocket
+
+OBJETIVO:
+O sistema deve funcionar OFFLINE e ser extremamente rápido para projeção ao vivo.
+
+DESIGN:
+Utilize um design moderno dark mode:
+- fundo preto/azul escuro
+- detalhes neon azul
+- interface minimalista premium
+- tipografia Poppins
+- estilo broadcast profissional
+- interface semelhante às imagens de referência anexadas
+
+TELAS NECESSÁRIAS:
+
+1. Tela Principal de Projeção
+- projeção fullscreen
+- letras grandes centralizadas
+- transição suave
+- suporte 16:9
+- fundo animado
+- logo da igreja
+- nome da música
+
+2. Tela de Retorno do Palco
+- letra atual
+- próxima linha
+- relógio
+- cronômetro do culto
+- próximo item da liturgia
+- avisos rápidos
+
+3. Tela do Operador
+- lista de músicas
+- controle de áudio
+- play/pause
+- próxima estrofe
+- voltar estrofe
+- busca rápida
+- preview em tempo real
+
+4. Tela de Liturgia
+- criar programação do culto
+- arrastar itens
+- tempo estimado
+- salvar liturgia
+- importar/exportar
+
+5. Tela de Coletâneas
+- capas das coletâneas
+- quantidade de músicas
+- pesquisa
+
+6. Tela Bíblia
+- busca de versículos
+- projeção instantânea
+- favoritos
+
+MÓDULO DE PERSISTÊNCIA:
+O primeiro passo do sistema deve ser criar um serviço de indexação.
+
+O sistema deve:
+- ler um banco legado SQLite chamado database.db
+- ler pasta config/musicas
+- detectar coletâneas organizadas por pasta
+- exemplo:
+  /config/musicas/1992 - Brilha Jesus/
+  /config/musicas/1993 - Louvores Eternos/
+
+INDEXAÇÃO:
+- indexar MP3
+- indexar letras
+- mapear caminhos absolutos
+- salvar cache local
+- detectar arquivos ausentes
+- sincronizar automaticamente
+
+ESTRUTURA DAS MÚSICAS:
+Cada música possui:
+- título
+- autor
+- letra
+- playback mp3
+- tom
+- bpm
+- categoria
+- coletânea
+- capa
+
+FUNCIONALIDADES:
+- modo offline
+- cache local
+- pesquisa instantânea
+- favoritos
+- histórico
+- atalhos de teclado
+- múltiplos monitores
+- fade de áudio
+- transições
+- preload de mídia
+- controle por teclado
+
+ARQUITETURA:
+Organize o projeto usando:
+- components
+- services
+- repositories
+- hooks
+- contexts
+
+Crie primeiro:
+1. Estrutura do projeto
+2. Banco de dados
+3. Serviço de indexação
+4. Sistema de leitura das músicas
+5. Layout principal
+
+Depois continue automaticamente criando as demais telas.

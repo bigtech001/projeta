@@ -1,10 +1,11 @@
-# [Project name]
+# ChurchLive
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Software moderno de projeção para igrejas — controle de músicas, liturgia, Bíblia e projeção ao vivo com comunicação em tempo real via WebSocket.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/api-server run dev` — run the API server (port 8080)
+- `pnpm --filter @workspace/church-projection run dev` — run the frontend (port 20976)
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
@@ -14,31 +15,55 @@ _Replace the heading above with the project's name, and this line with one sente
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
+- Frontend: React + Vite + Tailwind CSS (dark mode, Poppins font)
+- API: Express 5 + WebSocket (ws)
 - DB: PostgreSQL + Drizzle ORM
 - Validation: Zod (`zod/v4`), `drizzle-zod`
 - API codegen: Orval (from OpenAPI spec)
 - Build: esbuild (CJS bundle)
+- Real-time: WebSocket at `/ws`
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `lib/api-spec/openapi.yaml` — OpenAPI spec (source of truth)
+- `lib/db/src/schema/` — DB schema (collections, songs, liturgies, projection state)
+- `artifacts/api-server/src/routes/` — Route handlers (songs, collections, liturgy, bible, projection, stats)
+- `artifacts/api-server/src/lib/websocket.ts` — WebSocket server + broadcast
+- `artifacts/church-projection/src/` — React frontend
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- WebSocket path `/ws` is registered in `artifact.toml` alongside `/api` so the reverse proxy forwards it correctly
+- Projection state is stored in PostgreSQL and broadcasted via WebSocket on every control command
+- Bible data is in-memory (Portuguese books list + sample popular verses); search is done in-process
+- Song lyrics are split into verses by double newline; verse labels detected by regex
+- The `lib/api-zod/src/index.ts` exports only `./generated/api` (not types) to avoid duplicate export errors from Orval
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- **Home** — painel principal com relógio ao vivo, estatísticas e navegação
+- **Operador** — controle total da projeção: lista de músicas, letras verso a verso, controle de áudio, navegação por estrofes
+- **Projeção** — tela fullscreen 16:9 para o projetor com letras grandes e transições suaves
+- **Palco** — monitor de retorno para músicos: letra atual, próxima linha, relógio, cronômetro do culto
+- **Liturgia** — criar e gerenciar ordem do culto com itens arrastáveis e duração estimada
+- **Coletâneas** — biblioteca de coletâneas de músicas com busca
+- **Músicas** — lista completa com filtros, favoritos e busca
+- **Bíblia** — navegador por livros/capítulos e busca de versículos com projeção instantânea
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Stack obrigatória: React + Vite, Node.js/Express, PostgreSQL, WebSocket
+- Dark mode permanently (deep navy-black + neon blue)
+- Fonte Poppins
+- Interface em Português Brasileiro
+- Sistema deve funcionar offline (dados em cache local)
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- After adding new routes, restart the API Server workflow (it needs to rebuild)
+- The `/ws` path must be in `artifact.toml` paths array for WebSocket to work through the proxy
+- Run `pnpm --filter @workspace/api-spec run codegen` after any OpenAPI spec change, then fix `lib/api-zod/src/index.ts` to only export `./generated/api`
+- Bible verses are sample data only — a full Bible database can be added later
 
 ## Pointers
 
