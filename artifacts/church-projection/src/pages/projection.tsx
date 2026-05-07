@@ -1,7 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { motion, AnimatePresence, type HTMLMotionProps } from "framer-motion";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { useGetProjectionState, getGetProjectionStateQueryKey } from "@workspace/api-client-react";
+import { useSettings } from "@/hooks/use-settings";
 import { cn } from "@/lib/utils";
 
 function getProjectionBg(bg?: string): string {
@@ -59,11 +60,14 @@ export default function Projection() {
   });
 
   const state = wsState ?? pollState;
+  const { settings } = useSettings();
 
-  const projectionBg = localStorage.getItem("cl-projection-bg") ?? "black";
-  const fontSize = localStorage.getItem("cl-projection-fs") ?? "large";
-  const transitionStyle = localStorage.getItem("cl-projection-transition") ?? "fade";
-  const transitionProps = getTransitionProps(transitionStyle);
+  const projectionBg = settings.projectionBackground;
+  const fontSize = settings.projectionFontSize;
+  const transitionProps = useMemo(
+    () => getTransitionProps(settings.projectionTransition),
+    [settings.projectionTransition]
+  );
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {

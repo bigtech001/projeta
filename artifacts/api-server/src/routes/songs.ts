@@ -11,20 +11,9 @@ import {
   DeleteSongParams,
   GetSongVersesParams,
 } from "@workspace/api-zod";
+import { parseLyricsWithLabels } from "../lib/parse-lyrics";
 
 const router: IRouter = Router();
-
-function parseSongVerses(lyrics: string) {
-  const blocks = lyrics.split(/\n\s*\n/).filter((b) => b.trim());
-  return blocks.map((block, i) => {
-    const lines = block.split("\n").map((l) => l.trim()).filter(Boolean);
-    const firstLine = lines[0] ?? "";
-    const isLabel = /^(verso|estrofe|coro|refrão|bridge|pré-coro|intro|outro)\s*\d*/i.test(firstLine);
-    const label = isLabel ? firstLine : `Verso ${i + 1}`;
-    const contentLines = isLabel ? lines.slice(1) : lines;
-    return { index: i, label, lines: contentLines };
-  });
-}
 
 router.get("/songs", async (req, res): Promise<void> => {
   const query = ListSongsQueryParams.safeParse(req.query);
@@ -214,7 +203,7 @@ router.get("/songs/:id/verses", async (req, res): Promise<void> => {
     return;
   }
 
-  res.json(parseSongVerses(song.lyrics));
+  res.json(parseLyricsWithLabels(song.lyrics));
 });
 
 export default router;

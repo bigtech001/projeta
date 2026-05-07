@@ -73,7 +73,7 @@ const BIBLE_BOOKS = [
 ];
 
 const SAMPLE_VERSES: Record<string, Record<number, string[]>> = {
-  jo3: {
+  jo2: {
     1: [
       "Porque Deus amou o mundo de tal maneira que deu o seu Filho unigênito, para que todo aquele que nele crê não pereça, mas tenha a vida eterna.",
       "Porque Deus enviou o seu Filho ao mundo, não para que condenasse o mundo, mas para que o mundo fosse salvo por ele.",

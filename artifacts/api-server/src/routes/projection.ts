@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db, projectionStateTable, songsTable } from "@workspace/db";
 import { ControlProjectionBody } from "@workspace/api-zod";
 import { broadcastProjectionUpdate } from "../lib/websocket";
+import { parseLyrics } from "../lib/parse-lyrics";
 
 const router: IRouter = Router();
 
@@ -11,16 +12,6 @@ async function getOrCreateState() {
   if (rows[0]) return rows[0];
   const [state] = await db.insert(projectionStateTable).values({}).returning();
   return state;
-}
-
-function parseLyrics(lyrics: string) {
-  const blocks = lyrics.split(/\n\s*\n/).filter((b) => b.trim());
-  return blocks.map((block) => {
-    const lines = block.split("\n").map((l) => l.trim()).filter(Boolean);
-    const firstLine = lines[0] ?? "";
-    const isLabel = /^(verso|estrofe|coro|refrão|bridge|pré-coro|intro|outro)\s*\d*/i.test(firstLine);
-    return isLabel ? lines.slice(1) : lines;
-  });
 }
 
 router.get("/projection/state", async (_req, res): Promise<void> => {

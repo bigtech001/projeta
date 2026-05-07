@@ -220,7 +220,6 @@ export default function Settings() {
                         key={fs.id}
                         onClick={() => {
                           handleSave({ projectionFontSize: fs.id });
-                          localStorage.setItem("cl-projection-fs", fs.id);
                         }}
                         className={cn(
                           "flex-1 py-2 rounded-lg border text-sm font-medium transition-all",
@@ -243,7 +242,6 @@ export default function Settings() {
                         key={bg.id}
                         onClick={() => {
                           handleSave({ projectionBackground: bg.id });
-                          localStorage.setItem("cl-projection-bg", bg.id);
                         }}
                         className={cn(
                           "flex-1 py-2 rounded-lg border text-sm font-medium transition-all",
@@ -266,7 +264,6 @@ export default function Settings() {
                         key={tr.id}
                         onClick={() => {
                           handleSave({ projectionTransition: tr.id });
-                          localStorage.setItem("cl-projection-transition", tr.id);
                         }}
                         className={cn(
                           "flex-1 py-2 rounded-lg border text-sm font-medium transition-all",

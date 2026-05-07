@@ -417,7 +417,7 @@ export default function Operator() {
                   disabled={playbackMode === "lyrics-only"}
                   onClick={() => {
                     setIsPlaying((p) => {
-                      controlProjection.mutate({ data: { action: isPlaying ? "pause_audio" : "play_audio" } });
+                      controlProjection.mutate({ data: { action: p ? "pause_audio" : "play_audio" } });
                       return !p;
                     });
                   }}

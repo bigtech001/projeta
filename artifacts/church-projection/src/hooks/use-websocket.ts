@@ -30,8 +30,7 @@ export function useWebSocket() {
         reconnectTimeout = setTimeout(connect, 3000);
       };
       
-      ws.current.onerror = (err) => {
-        console.error("WebSocket error:", err);
+      ws.current.onerror = () => {
         ws.current?.close();
       }
     };

@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import fs from "fs/promises";
 import path from "path";
 import { db, songsTable } from "@workspace/db";
-import { like } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -60,7 +60,7 @@ router.post("/audio/scan", async (_req, res): Promise<void> => {
         await db
           .update(songsTable)
           .set({ mp3Path: `/config/musicas/${entry.name}` })
-          .where(like(songsTable.title, match.title));
+          .where(eq(songsTable.id, match.id));
         linked++;
       }
     }

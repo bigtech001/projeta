@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "xLZ_CJ9OjxlEu8xzwXbY7"
+uri = "file://ARCHITECTURE.md"
+type = "text"
+title = "ChurchLive — Architecture Summary"
