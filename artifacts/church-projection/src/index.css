@@ -212,6 +212,114 @@
   --shadow-2xl: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00);
 }
 
+/* ========== THEME: Worship Purple ========== */
+.dark.theme-worship-purple {
+  --primary: 270 80% 60%;
+  --primary-foreground: 0 0% 100%;
+  --primary-border: hsl(270 80% 60%);
+
+  --background: 265 30% 6%;
+  --foreground: 0 0% 100%;
+
+  --card: 265 30% 11%;
+  --card-foreground: 0 0% 100%;
+  --card-border: 265 30% 20%;
+
+  --border: 265 30% 20%;
+
+  --sidebar: 265 30% 11%;
+  --sidebar-foreground: 0 0% 100%;
+  --sidebar-border: 265 30% 20%;
+  --sidebar-primary: 270 80% 60%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 265 30% 20%;
+  --sidebar-accent-foreground: 0 0% 100%;
+  --sidebar-ring: 270 80% 60%;
+
+  --secondary: 265 30% 20%;
+  --secondary-foreground: 0 0% 100%;
+
+  --muted: 265 20% 16%;
+  --muted-foreground: 0 0% 65%;
+
+  --accent: 270 80% 60%;
+  --accent-foreground: 0 0% 100%;
+
+  --input: 265 30% 20%;
+  --ring: 270 80% 60%;
+
+  --popover: 265 30% 11%;
+  --popover-foreground: 0 0% 100%;
+  --popover-border: 265 30% 20%;
+
+  --chart-1: 270 80% 60%;
+  --chart-2: 290 60% 55%;
+  --chart-3: 250 60% 50%;
+  --chart-4: 310 50% 45%;
+  --chart-5: 230 50% 40%;
+}
+
+/* ========== THEME: Light Modern ========== */
+.theme-light-modern {
+  --button-outline: rgba(0,0,0,.10);
+  --badge-outline: rgba(0,0,0,.05);
+  --opaque-button-border-intensity: -8;
+  --elevate-1: rgba(0,0,0,.03);
+  --elevate-2: rgba(0,0,0,.08);
+
+  --background: 220 25% 97%;
+  --foreground: 220 30% 12%;
+
+  --border: 220 20% 85%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 220 30% 12%;
+  --card-border: 220 20% 88%;
+
+  --sidebar: 220 25% 94%;
+  --sidebar-foreground: 220 30% 12%;
+  --sidebar-border: 220 20% 85%;
+  --sidebar-primary: 212 100% 50%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 220 20% 90%;
+  --sidebar-accent-foreground: 220 30% 12%;
+  --sidebar-ring: 212 100% 50%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 220 30% 12%;
+  --popover-border: 220 20% 85%;
+
+  --primary: 212 100% 50%;
+  --primary-foreground: 0 0% 100%;
+  --primary-border: hsl(212 100% 45%);
+
+  --secondary: 220 20% 92%;
+  --secondary-foreground: 220 30% 20%;
+
+  --muted: 220 20% 93%;
+  --muted-foreground: 220 15% 45%;
+
+  --accent: 212 100% 50%;
+  --accent-foreground: 0 0% 100%;
+  --accent-border: hsl(212 100% 45%);
+
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --destructive-border: hsl(0 84% 55%);
+
+  --secondary-border: hsl(220 20% 85%);
+  --muted-border: hsl(220 20% 87%);
+
+  --input: 220 20% 88%;
+  --ring: 212 100% 50%;
+
+  --chart-1: 212 100% 50%;
+  --chart-2: 212 60% 60%;
+  --chart-3: 212 40% 45%;
+  --chart-4: 250 60% 55%;
+  --chart-5: 190 60% 45%;
+}
+
 @layer base {
   * {
     @apply border-border;

@@ -499,6 +499,25 @@ export const ControlProjectionResponse = zod.object({
 });
 
 /**
+ * @summary List MP3 files from config/musicas folder
+ */
+export const ListAudioFilesResponseItem = zod.object({
+  filename: zod.string(),
+  title: zod.string(),
+  path: zod.string(),
+  songId: zod.number().nullish(),
+});
+export const ListAudioFilesResponse = zod.array(ListAudioFilesResponseItem);
+
+/**
+ * @summary Scan and link MP3 files to songs
+ */
+export const ScanAudioFilesResponse = zod.object({
+  scanned: zod.number(),
+  linked: zod.number(),
+});
+
+/**
  * @summary Get dashboard overview stats
  */
 export const GetStatsOverviewResponse = zod.object({

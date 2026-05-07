@@ -17,6 +17,8 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AudioFile,
+  AudioScanResult,
   BibleBook,
   BibleVerse,
   Collection,
@@ -2005,6 +2007,162 @@ export const useControlProjection = <
   TContext
 > => {
   return useMutation(getControlProjectionMutationOptions(options));
+};
+
+/**
+ * @summary List MP3 files from config/musicas folder
+ */
+export const getListAudioFilesUrl = () => {
+  return `/api/audio/files`;
+};
+
+export const listAudioFiles = async (
+  options?: RequestInit,
+): Promise<AudioFile[]> => {
+  return customFetch<AudioFile[]>(getListAudioFilesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListAudioFilesQueryKey = () => {
+  return [`/api/audio/files`] as const;
+};
+
+export const getListAudioFilesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAudioFiles>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listAudioFiles>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListAudioFilesQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAudioFiles>>> = ({
+    signal,
+  }) => listAudioFiles({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAudioFiles>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAudioFilesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAudioFiles>>
+>;
+export type ListAudioFilesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List MP3 files from config/musicas folder
+ */
+
+export function useListAudioFiles<
+  TData = Awaited<ReturnType<typeof listAudioFiles>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listAudioFiles>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAudioFilesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Scan and link MP3 files to songs
+ */
+export const getScanAudioFilesUrl = () => {
+  return `/api/audio/scan`;
+};
+
+export const scanAudioFiles = async (
+  options?: RequestInit,
+): Promise<AudioScanResult> => {
+  return customFetch<AudioScanResult>(getScanAudioFilesUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getScanAudioFilesMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof scanAudioFiles>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof scanAudioFiles>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["scanAudioFiles"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof scanAudioFiles>>,
+    void
+  > = () => {
+    return scanAudioFiles(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ScanAudioFilesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof scanAudioFiles>>
+>;
+
+export type ScanAudioFilesMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Scan and link MP3 files to songs
+ */
+export const useScanAudioFiles = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof scanAudioFiles>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof scanAudioFiles>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getScanAudioFilesMutationOptions(options));
 };
 
 /**

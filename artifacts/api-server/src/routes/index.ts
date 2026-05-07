@@ -6,6 +6,7 @@ import liturgyRouter from "./liturgy";
 import bibleRouter from "./bible";
 import projectionRouter from "./projection";
 import statsRouter from "./stats";
+import audioRouter from "./audio";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(liturgyRouter);
 router.use(bibleRouter);
 router.use(projectionRouter);
 router.use(statsRouter);
+router.use(audioRouter);
 
 export default router;

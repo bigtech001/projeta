@@ -27,9 +27,10 @@ Software moderno de projeção para igrejas — controle de músicas, liturgia, 
 
 - `lib/api-spec/openapi.yaml` — OpenAPI spec (source of truth)
 - `lib/db/src/schema/` — DB schema (collections, songs, liturgies, projection state)
-- `artifacts/api-server/src/routes/` — Route handlers (songs, collections, liturgy, bible, projection, stats)
+- `artifacts/api-server/src/routes/` — Route handlers (songs, collections, liturgy, bible, projection, stats, audio)
 - `artifacts/api-server/src/lib/websocket.ts` — WebSocket server + broadcast
 - `artifacts/church-projection/src/` — React frontend
+- `config/musicas/` — Drop MP3 files here for automatic indexing
 
 ## Architecture decisions
 
@@ -38,17 +39,50 @@ Software moderno de projeção para igrejas — controle de músicas, liturgia, 
 - Bible data is in-memory (Portuguese books list + sample popular verses); search is done in-process
 - Song lyrics are split into verses by double newline; verse labels detected by regex
 - The `lib/api-zod/src/index.ts` exports only `./generated/api` (not types) to avoid duplicate export errors from Orval
+- Settings stored in localStorage (theme, church name, logo, projection/audio prefs) — shared across all windows same-origin
+- Themes applied via CSS class on `<html>`: `dark` (default), `dark theme-worship-purple`, or `theme-light-modern`
 
 ## Product
 
 - **Home** — painel principal com relógio ao vivo, estatísticas e navegação
-- **Operador** — controle total da projeção: lista de músicas, letras verso a verso, controle de áudio, navegação por estrofes
-- **Projeção** — tela fullscreen 16:9 para o projetor com letras grandes e transições suaves
-- **Palco** — monitor de retorno para músicos: letra atual, próxima linha, relógio, cronômetro do culto
+- **Operador** — controle total da projeção com atalhos de teclado, modo de reprodução, botões para abrir janelas externas
+- **Projeção** — tela fullscreen 16:9 para o projetor; suporte a múltiplos monitores via `window.open`; tecla F = fullscreen
+- **Palco** — monitor de retorno com letra atual/próxima, relógio, cronômetro do culto, próximo item da liturgia
 - **Liturgia** — criar e gerenciar ordem do culto com itens arrastáveis e duração estimada
 - **Coletâneas** — biblioteca de coletâneas de músicas com busca
 - **Músicas** — lista completa com filtros, favoritos e busca
 - **Bíblia** — navegador por livros/capítulos e busca de versículos com projeção instantânea
+- **Configurações** — nome/logo da igreja, seletor de 3 temas, configurações de projeção e áudio, pasta de MP3
+
+## Keyboard shortcuts (Operator screen)
+
+| Key | Action |
+|-----|--------|
+| → / ↓ | Next verse |
+| ← / ↑ | Previous verse |
+| Space / Esc | Clear projection |
+| F | Focus search |
+| P | Open projection window |
+| S | Open stage monitor |
+| ? | Show shortcuts help |
+
+## Themes
+
+Three selectable themes in Settings:
+1. **Dark Blue Premium** — navy-black + neon blue (default)
+2. **Worship Purple** — deep purple-black + purple accent
+3. **Light Modern** — clean light mode with blue accent
+
+## Music Playback Modes (Operator)
+
+Double-click a song (or click the MonitorPlay icon) to launch the mode selector:
+1. **Somente Letras** — lyrics only, no audio
+2. **Letras + Playback** — lyrics with audio player controls
+3. **Letras + Áudio Cantado** — lyrics with full MP3 playback
+
+## MP3 / Audio Indexing
+
+Place `.mp3` files in `config/musicas/` (server-side). In Settings → Pasta de Músicas, click "Escanear e Vincular" to auto-link files to songs by matching filename to song title.
 
 ## User preferences
 
@@ -64,6 +98,7 @@ Software moderno de projeção para igrejas — controle de músicas, liturgia, 
 - The `/ws` path must be in `artifact.toml` paths array for WebSocket to work through the proxy
 - Run `pnpm --filter @workspace/api-spec run codegen` after any OpenAPI spec change, then fix `lib/api-zod/src/index.ts` to only export `./generated/api`
 - Bible verses are sample data only — a full Bible database can be added later
+- When opening projection/stage windows, they inherit localStorage theme automatically
 
 ## Pointers
 

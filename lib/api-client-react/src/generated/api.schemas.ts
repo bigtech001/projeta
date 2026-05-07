@@ -257,6 +257,18 @@ export interface ProjectionCommand {
   liturgyId?: number;
 }
 
+export interface AudioFile {
+  filename: string;
+  title: string;
+  path: string;
+  songId?: number | null;
+}
+
+export interface AudioScanResult {
+  scanned: number;
+  linked: number;
+}
+
 export interface StatsOverview {
   totalSongs: number;
   totalCollections: number;
