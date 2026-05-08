@@ -1,6 +1,6 @@
 kind = "web"
 previewPath = "/"
-title = "Church Projection"
+title = "Projeto live"
 version = "1.0.0"
 id = "artifacts/church-projection"
 router = "path"
