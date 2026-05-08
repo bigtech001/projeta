@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, and, desc } from "drizzle-orm";
+import { eq, like, and, desc } from "drizzle-orm";
 import { db, songsTable, collectionsTable } from "@workspace/db";
 import {
   ListSongsQueryParams,
@@ -15,6 +15,22 @@ import { parseLyricsWithLabels } from "../lib/parse-lyrics";
 
 const router: IRouter = Router();
 
+const songWithCollection = {
+  id: songsTable.id,
+  title: songsTable.title,
+  author: songsTable.author,
+  lyrics: songsTable.lyrics,
+  mp3Path: songsTable.mp3Path,
+  key: songsTable.key,
+  bpm: songsTable.bpm,
+  category: songsTable.category,
+  collectionId: songsTable.collectionId,
+  collectionName: collectionsTable.name,
+  coverImage: songsTable.coverImage,
+  isFavorite: songsTable.isFavorite,
+  createdAt: songsTable.createdAt,
+};
+
 router.get("/songs", async (req, res): Promise<void> => {
   const query = ListSongsQueryParams.safeParse(req.query);
   if (!query.success) {
@@ -25,26 +41,13 @@ router.get("/songs", async (req, res): Promise<void> => {
   const { search, collectionId, category } = query.data;
 
   const conditions = [];
-  if (search) conditions.push(ilike(songsTable.title, `%${search}%`));
+  // SQLite LIKE is case-insensitive for ASCII by default
+  if (search) conditions.push(like(songsTable.title, `%${search}%`));
   if (collectionId) conditions.push(eq(songsTable.collectionId, collectionId));
   if (category) conditions.push(eq(songsTable.category, category));
 
   const songs = await db
-    .select({
-      id: songsTable.id,
-      title: songsTable.title,
-      author: songsTable.author,
-      lyrics: songsTable.lyrics,
-      mp3Path: songsTable.mp3Path,
-      key: songsTable.key,
-      bpm: songsTable.bpm,
-      category: songsTable.category,
-      collectionId: songsTable.collectionId,
-      collectionName: collectionsTable.name,
-      coverImage: songsTable.coverImage,
-      isFavorite: songsTable.isFavorite,
-      createdAt: songsTable.createdAt,
-    })
+    .select(songWithCollection)
     .from(songsTable)
     .leftJoin(collectionsTable, eq(songsTable.collectionId, collectionsTable.id))
     .where(conditions.length ? and(...conditions) : undefined)
@@ -61,27 +64,13 @@ router.post("/songs", async (req, res): Promise<void> => {
   }
 
   const [song] = await db.insert(songsTable).values(parsed.data).returning();
-  const withCollection = await db
-    .select({
-      id: songsTable.id,
-      title: songsTable.title,
-      author: songsTable.author,
-      lyrics: songsTable.lyrics,
-      mp3Path: songsTable.mp3Path,
-      key: songsTable.key,
-      bpm: songsTable.bpm,
-      category: songsTable.category,
-      collectionId: songsTable.collectionId,
-      collectionName: collectionsTable.name,
-      coverImage: songsTable.coverImage,
-      isFavorite: songsTable.isFavorite,
-      createdAt: songsTable.createdAt,
-    })
+  const [withCollection] = await db
+    .select(songWithCollection)
     .from(songsTable)
     .leftJoin(collectionsTable, eq(songsTable.collectionId, collectionsTable.id))
     .where(eq(songsTable.id, song.id));
 
-  res.status(201).json(GetSongResponse.parse(withCollection[0]));
+  res.status(201).json(GetSongResponse.parse(withCollection));
 });
 
 router.get("/songs/:id", async (req, res): Promise<void> => {
@@ -92,32 +81,18 @@ router.get("/songs/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  const rows = await db
-    .select({
-      id: songsTable.id,
-      title: songsTable.title,
-      author: songsTable.author,
-      lyrics: songsTable.lyrics,
-      mp3Path: songsTable.mp3Path,
-      key: songsTable.key,
-      bpm: songsTable.bpm,
-      category: songsTable.category,
-      collectionId: songsTable.collectionId,
-      collectionName: collectionsTable.name,
-      coverImage: songsTable.coverImage,
-      isFavorite: songsTable.isFavorite,
-      createdAt: songsTable.createdAt,
-    })
+  const [row] = await db
+    .select(songWithCollection)
     .from(songsTable)
     .leftJoin(collectionsTable, eq(songsTable.collectionId, collectionsTable.id))
     .where(eq(songsTable.id, params.data.id));
 
-  if (!rows[0]) {
+  if (!row) {
     res.status(404).json({ error: "Song not found" });
     return;
   }
 
-  res.json(GetSongResponse.parse(rows[0]));
+  res.json(GetSongResponse.parse(row));
 });
 
 router.put("/songs/:id", async (req, res): Promise<void> => {
@@ -145,27 +120,13 @@ router.put("/songs/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  const rows = await db
-    .select({
-      id: songsTable.id,
-      title: songsTable.title,
-      author: songsTable.author,
-      lyrics: songsTable.lyrics,
-      mp3Path: songsTable.mp3Path,
-      key: songsTable.key,
-      bpm: songsTable.bpm,
-      category: songsTable.category,
-      collectionId: songsTable.collectionId,
-      collectionName: collectionsTable.name,
-      coverImage: songsTable.coverImage,
-      isFavorite: songsTable.isFavorite,
-      createdAt: songsTable.createdAt,
-    })
+  const [row] = await db
+    .select(songWithCollection)
     .from(songsTable)
     .leftJoin(collectionsTable, eq(songsTable.collectionId, collectionsTable.id))
     .where(eq(songsTable.id, params.data.id));
 
-  res.json(GetSongResponse.parse(rows[0]));
+  res.json(GetSongResponse.parse(row));
 });
 
 router.delete("/songs/:id", async (req, res): Promise<void> => {

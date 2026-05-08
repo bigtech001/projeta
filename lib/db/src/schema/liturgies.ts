@@ -1,18 +1,23 @@
-import { pgTable, text, serial, timestamp, integer } from "drizzle-orm/pg-core";
+import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { songsTable } from "./songs";
 
-export const liturgiesTable = pgTable("liturgies", {
-  id: serial("id").primaryKey(),
+export const liturgiesTable = sqliteTable("liturgies", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   title: text("title").notNull(),
   serviceDate: text("service_date"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
 
-export const liturgyItemsTable = pgTable("liturgy_items", {
-  id: serial("id").primaryKey(),
-  liturgyId: integer("liturgy_id").notNull().references(() => liturgiesTable.id, { onDelete: "cascade" }),
+export const liturgyItemsTable = sqliteTable("liturgy_items", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  liturgyId: integer("liturgy_id")
+    .notNull()
+    .references(() => liturgiesTable.id, { onDelete: "cascade" }),
   type: text("type").notNull().default("louvor"),
   title: text("title").notNull(),
   details: text("details"),

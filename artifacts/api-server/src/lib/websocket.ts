@@ -25,13 +25,18 @@ export function setupWebSocket(server: Server) {
   logger.info("WebSocket server ready at /ws");
 }
 
-export function broadcastProjectionUpdate(state: object) {
+/** Broadcast any typed message to all connected clients. */
+export function broadcast(payload: { type: string; data?: unknown }) {
   if (!wss) return;
-
-  const message = JSON.stringify({ type: "projection_update", data: state });
+  const message = JSON.stringify(payload);
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(message);
     }
   });
+}
+
+/** Broadcast a full projection state update. */
+export function broadcastProjectionUpdate(state: object) {
+  broadcast({ type: "projection_update", data: state });
 }

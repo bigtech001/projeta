@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, sql } from "drizzle-orm";
+import { eq, like, sql } from "drizzle-orm";
 import { db, collectionsTable, songsTable } from "@workspace/db";
 import {
   ListCollectionsQueryParams,
@@ -8,6 +8,14 @@ import {
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
+
+const collectionWithCount = {
+  id: collectionsTable.id,
+  name: collectionsTable.name,
+  coverImage: collectionsTable.coverImage,
+  songCount: sql<number>`cast(count(${songsTable.id}) as int)`,
+  createdAt: collectionsTable.createdAt,
+};
 
 router.get("/collections", async (req, res): Promise<void> => {
   const query = ListCollectionsQueryParams.safeParse(req.query);
@@ -19,16 +27,11 @@ router.get("/collections", async (req, res): Promise<void> => {
   const { search } = query.data;
 
   const collections = await db
-    .select({
-      id: collectionsTable.id,
-      name: collectionsTable.name,
-      coverImage: collectionsTable.coverImage,
-      songCount: sql<number>`cast(count(${songsTable.id}) as int)`,
-      createdAt: collectionsTable.createdAt,
-    })
+    .select(collectionWithCount)
     .from(collectionsTable)
     .leftJoin(songsTable, eq(songsTable.collectionId, collectionsTable.id))
-    .where(search ? ilike(collectionsTable.name, `%${search}%`) : undefined)
+    // SQLite LIKE is case-insensitive for ASCII by default
+    .where(search ? like(collectionsTable.name, `%${search}%`) : undefined)
     .groupBy(collectionsTable.id);
 
   res.json(collections);
@@ -43,20 +46,14 @@ router.post("/collections", async (req, res): Promise<void> => {
 
   const [collection] = await db.insert(collectionsTable).values(parsed.data).returning();
 
-  const result = await db
-    .select({
-      id: collectionsTable.id,
-      name: collectionsTable.name,
-      coverImage: collectionsTable.coverImage,
-      songCount: sql<number>`cast(count(${songsTable.id}) as int)`,
-      createdAt: collectionsTable.createdAt,
-    })
+  const [result] = await db
+    .select(collectionWithCount)
     .from(collectionsTable)
     .leftJoin(songsTable, eq(songsTable.collectionId, collectionsTable.id))
     .where(eq(collectionsTable.id, collection.id))
     .groupBy(collectionsTable.id);
 
-  res.status(201).json(result[0]);
+  res.status(201).json(result);
 });
 
 router.get("/collections/:id", async (req, res): Promise<void> => {

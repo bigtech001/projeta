@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useWebSocket } from "@/hooks/use-websocket";
+import { useAudioPlayer, formatAudioTime } from "@/hooks/use-audio-player";
+import { useElectron } from "@/hooks/use-electron";
 import {
   useGetProjectionState,
   getGetProjectionStateQueryKey,
@@ -61,8 +63,8 @@ export default function Operator() {
   const [pendingSongId, setPendingSongId] = useState<number | null>(null);
   const [showModeDialog, setShowModeDialog] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
-  const [volume, setVolume] = useState(settings.audioDefaultVolume);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const audio = useAudioPlayer();
+  const electron = useElectron();
 
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -89,10 +91,9 @@ export default function Operator() {
     controlProjection.mutate({ data: { action: "show_song", songId, verseIndex: 0 } });
     setSelectedSongId(songId);
     if (m === "lyrics-playback" || m === "lyrics-audio") {
-      setIsPlaying(true);
-      controlProjection.mutate({ data: { action: "play_audio" } });
+      audio.load(songId, settings.audioDefaultVolume);
     }
-  }, [playbackMode, controlProjection]);
+  }, [playbackMode, controlProjection, audio, settings.audioDefaultVolume]);
 
   const handleNextVerse = useCallback(() => {
     controlProjection.mutate({ data: { action: "next_verse" } });
@@ -113,19 +114,27 @@ export default function Operator() {
   }, [controlProjection]);
 
   const handleVolumeChange = useCallback((v: number) => {
-    setVolume(v);
+    audio.setVolume(v);
     controlProjection.mutate({ data: { action: "set_volume", volume: v } });
-  }, [controlProjection]);
+  }, [audio, controlProjection]);
 
   const openProjection = useCallback(() => {
-    const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
-    window.open(`${base}/projection`, "projection-screen", "toolbar=no,menubar=no,scrollbars=no,resizable=yes,width=1280,height=720");
-  }, []);
+    if (electron.openProjectionWindow) {
+      void electron.openProjectionWindow();
+    } else {
+      const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+      window.open(`${base}/projection`, "projection-screen", "toolbar=no,menubar=no,scrollbars=no,resizable=yes,width=1280,height=720");
+    }
+  }, [electron]);
 
   const openStage = useCallback(() => {
-    const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
-    window.open(`${base}/stage`, "stage-monitor", "toolbar=no,menubar=no,scrollbars=no,resizable=yes,width=1024,height=640");
-  }, []);
+    if (electron.openStageWindow) {
+      void electron.openStageWindow();
+    } else {
+      const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+      window.open(`${base}/stage`, "stage-monitor", "toolbar=no,menubar=no,scrollbars=no,resizable=yes,width=1024,height=640");
+    }
+  }, [electron]);
 
   const onSongClick = (songId: number) => {
     setSelectedSongId(songId);
@@ -407,50 +416,59 @@ export default function Operator() {
               <h3 className="font-semibold text-xs uppercase tracking-wider text-muted-foreground mb-4">
                 Controles de Áudio
               </h3>
-              <div className="flex justify-center gap-3 mb-5">
-                <Button size="icon" variant="outline" className="h-10 w-10 rounded-full">
+              <div className="flex justify-center gap-3 mb-4">
+                <Button
+                  size="icon"
+                  variant="outline"
+                  className="h-10 w-10 rounded-full"
+                  disabled={playbackMode === "lyrics-only" || !audio.state.isLoaded}
+                  onClick={() => audio.stop()}
+                >
                   <SkipBack className="h-4 w-4" />
                 </Button>
                 <Button
                   size="icon"
                   className="h-12 w-12 rounded-full shadow-lg shadow-primary/20"
-                  disabled={playbackMode === "lyrics-only"}
-                  onClick={() => {
-                    setIsPlaying((p) => {
-                      controlProjection.mutate({ data: { action: p ? "pause_audio" : "play_audio" } });
-                      return !p;
-                    });
-                  }}
+                  disabled={playbackMode === "lyrics-only" || !audio.state.isLoaded}
+                  onClick={() => audio.state.isPlaying ? audio.pause() : audio.play()}
                 >
-                  {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5 ml-0.5" />}
+                  {audio.state.isPlaying
+                    ? <Pause className="h-5 w-5" />
+                    : <Play className="h-5 w-5 ml-0.5" />}
                 </Button>
                 <Button
                   size="icon"
                   variant="outline"
                   className="h-10 w-10 rounded-full"
-                  disabled={playbackMode === "lyrics-only"}
-                  onClick={() => {
-                    setIsPlaying(false);
-                    controlProjection.mutate({ data: { action: "stop_audio" } });
-                  }}
+                  disabled={playbackMode === "lyrics-only" || !audio.state.isLoaded}
+                  onClick={() => audio.stop()}
                 >
                   <Square className="h-4 w-4" />
                 </Button>
               </div>
 
-              {playbackMode === "lyrics-only" && (
+              {playbackMode === "lyrics-only" ? (
                 <p className="text-xs text-muted-foreground text-center mb-3">
                   Modo: Somente Letras
+                </p>
+              ) : audio.state.isLoaded ? (
+                <div className="flex justify-between text-xs text-muted-foreground font-mono mb-3">
+                  <span>{formatAudioTime(audio.state.currentTime)}</span>
+                  <span>{formatAudioTime(audio.state.duration)}</span>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground text-center mb-3">
+                  {audio.state.hasError ? "Arquivo não encontrado" : "Sem áudio carregado"}
                 </p>
               )}
 
               <div className="space-y-2">
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>Volume</span>
-                  <span className="font-mono">{volume}%</span>
+                  <span className="font-mono">{audio.state.volume}%</span>
                 </div>
                 <Slider
-                  value={[volume]}
+                  value={[audio.state.volume]}
                   onValueChange={([v]) => handleVolumeChange(v)}
                   max={100}
                   step={1}

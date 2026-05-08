@@ -1,8 +1,9 @@
-import { pgTable, text, serial, timestamp, integer, boolean, real } from "drizzle-orm/pg-core";
+import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
 
-export const projectionStateTable = pgTable("projection_state", {
-  id: serial("id").primaryKey(),
-  isActive: boolean("is_active").notNull().default(false),
+export const projectionStateTable = sqliteTable("projection_state", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(false),
   mode: text("mode"),
   currentSongId: integer("current_song_id"),
   currentSongTitle: text("current_song_title"),
@@ -13,10 +14,12 @@ export const projectionStateTable = pgTable("projection_state", {
   bibleVerse: text("bible_verse"),
   bibleReference: text("bible_reference"),
   announcement: text("announcement"),
-  isAudioPlaying: boolean("is_audio_playing").notNull().default(false),
+  isAudioPlaying: integer("is_audio_playing", { mode: "boolean" }).notNull().default(false),
   audioVolume: real("audio_volume").notNull().default(0.8),
   currentLiturgyId: integer("current_liturgy_id"),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 });
 
 export type ProjectionState = typeof projectionStateTable.$inferSelect;

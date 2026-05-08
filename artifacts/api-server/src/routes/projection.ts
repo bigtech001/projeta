@@ -120,7 +120,7 @@ router.post("/projection/control", async (req, res): Promise<void> => {
   if (Object.keys(updateData).length > 0) {
     const [updated] = await db
       .update(projectionStateTable)
-      .set({ ...updateData, updatedAt: new Date() })
+      .set({ ...updateData, updatedAt: new Date().toISOString() })
       .where(eq(projectionStateTable.id, state.id))
       .returning();
 

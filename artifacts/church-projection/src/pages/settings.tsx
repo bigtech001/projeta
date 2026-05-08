@@ -3,6 +3,7 @@ import { MainLayout } from "@/components/layout/main-layout";
 import { useSettings } from "@/hooks/use-settings";
 import { useTheme, type Theme } from "@/contexts/theme-context";
 import { useScanAudioFiles, useListAudioFiles, getListAudioFilesQueryKey } from "@workspace/api-client-react";
+import { useElectron, getApiBase } from "@/hooks/use-electron";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +12,7 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { Upload, CheckCircle, Music2, FolderOpen, RefreshCw, Palette, Settings2, Volume2, Monitor } from "lucide-react";
+import { Upload, CheckCircle, Music2, FolderOpen, RefreshCw, Palette, Settings2, Volume2, Monitor, HardDrive } from "lucide-react";
 
 const themes: { id: Theme; label: string; desc: string; preview: string }[] = [
   {
@@ -57,7 +58,9 @@ export default function Settings() {
   const { settings, updateSettings } = useSettings();
   const { theme, setTheme } = useTheme();
   const [saved, setSaved] = useState(false);
+  const [folderChanging, setFolderChanging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const electron = useElectron();
 
   const { data: audioFiles, refetch: refetchAudio } = useListAudioFiles({
     query: { queryKey: getListAudioFilesQueryKey() },
@@ -68,6 +71,25 @@ export default function Settings() {
     updateSettings(partial);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleSelectFolder = async () => {
+    if (!electron.selectFolder) return;
+    setFolderChanging(true);
+    try {
+      const folder = await electron.selectFolder();
+      if (!folder) return;
+      handleSave({ musicasFolder: folder });
+      // Tell the API server to start watching the new folder
+      await fetch(`${getApiBase()}/api/audio/watch-folder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folder }),
+      });
+      await refetchAudio();
+    } finally {
+      setFolderChanging(false);
+    }
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -328,16 +350,39 @@ export default function Settings() {
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-3 bg-background border border-border rounded-lg px-4 py-3">
                   <FolderOpen className="w-5 h-5 text-muted-foreground shrink-0" />
-                  <code className="text-sm text-muted-foreground flex-1">config/musicas/</code>
-                  <Badge variant="outline" className="text-xs">
+                  <code className="text-sm text-muted-foreground flex-1 truncate">
+                    {settings.musicasFolder || "config/musicas"}
+                  </code>
+                  <Badge variant="outline" className="text-xs shrink-0">
                     {audioFiles?.length ?? 0} arquivo(s)
                   </Badge>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Coloque arquivos MP3 na pasta <code className="bg-muted px-1 rounded text-xs">config/musicas/</code> no servidor.
-                  O nome do arquivo deve corresponder ao título da música para vinculação automática.
-                </p>
-                <div className="flex gap-3">
+
+                {electron.isElectron ? (
+                  <p className="text-sm text-muted-foreground">
+                    Clique em <strong>Selecionar Pasta</strong> para escolher a pasta com seus MP3.
+                    Os arquivos são vinculados automaticamente pelo nome.
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Coloque arquivos MP3 na pasta{" "}
+                    <code className="bg-muted px-1 rounded text-xs">config/musicas/</code> no servidor.
+                    O nome do arquivo deve corresponder ao título da música para vinculação automática.
+                  </p>
+                )}
+
+                <div className="flex gap-3 flex-wrap">
+                  {electron.isElectron && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSelectFolder}
+                      disabled={folderChanging}
+                    >
+                      <HardDrive className={cn("w-4 h-4 mr-2", folderChanging && "animate-pulse")} />
+                      {folderChanging ? "Selecionando..." : "Selecionar Pasta"}
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
