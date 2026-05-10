@@ -6,39 +6,42 @@ directories:
   output: dist-electron
   buildResources: build-resources
 
+# Electron main process files only — frontend is served by the embedded Express
 files:
   - dist/**/*
   - "!dist-electron"
 
 extraResources:
+  # Bundle the compiled API server so the main process can spawn it
   - from: "../api-server/dist"
     to: "api-server/dist"
-  - from: "../../data"
-    to: "data"
     filter:
-      - "**/*.db"
+      - "**/*"
+  # Bundle the compiled React frontend for production (Express serves it)
+  - from: "../church-projection/dist/public"
+    to: "public"
+    filter:
+      - "**/*"
 
 asar: true
 
+# ── macOS ──────────────────────────────────────────────────────────────────────
 mac:
   category: public.app-category.music
   target:
     - target: dmg
       arch: [x64, arm64]
   darkModeSupport: true
+  entitlements: build-resources/entitlements.mac.plist
+  entitlementsInherit: build-resources/entitlements.mac.plist
+  hardenedRuntime: true
 
+# ── Windows (NSIS installer) ───────────────────────────────────────────────────
 win:
   target:
     - target: nsis
       arch: [x64]
   icon: build-resources/icon.ico
-
-linux:
-  target:
-    - target: AppImage
-      arch: [x64]
-  category: AudioVideo
-  icon: build-resources/icon.png
 
 nsis:
   oneClick: false
@@ -48,7 +51,20 @@ nsis:
   installerLanguages:
     - pt_BR
     - en_US
+  # Show license during install
+  license: build-resources/license.txt
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
 
+# ── Linux ──────────────────────────────────────────────────────────────────────
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+  category: AudioVideo
+  icon: build-resources/icon.png
+
+# ── Auto-updater (GitHub Releases) ────────────────────────────────────────────
 publish:
   provider: github
   releaseType: release

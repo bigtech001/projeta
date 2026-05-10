@@ -1,8 +1,8 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useSettings } from "@/hooks/use-settings";
 import { useTheme, type Theme } from "@/contexts/theme-context";
-import { useScanAudioFiles, useListAudioFiles, getListAudioFilesQueryKey } from "@workspace/api-client-react";
+import { useListAudioFiles, getListAudioFilesQueryKey } from "@workspace/api-client-react";
 import { useElectron, getApiBase } from "@/hooks/use-electron";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,10 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { Upload, CheckCircle, Music2, FolderOpen, RefreshCw, Palette, Settings2, Volume2, Monitor, HardDrive } from "lucide-react";
+import {
+  Upload, CheckCircle, Music2, FolderOpen, RefreshCw, Palette,
+  Settings2, Volume2, Monitor, HardDrive, ExternalLink, FileText,
+} from "lucide-react";
 
 const themes: { id: Theme; label: string; desc: string; preview: string }[] = [
   {
@@ -59,13 +62,29 @@ export default function Settings() {
   const { theme, setTheme } = useTheme();
   const [saved, setSaved] = useState(false);
   const [folderChanging, setFolderChanging] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [lastScanResult, setLastScanResult] = useState<{
+    scanned: number; linked: number; lyrics: number; removed: number;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const electron = useElectron();
 
   const { data: audioFiles, refetch: refetchAudio } = useListAudioFiles({
     query: { queryKey: getListAudioFilesQueryKey() },
   });
-  const scanAudio = useScanAudioFiles();
+
+  // Listen for scan-complete events pushed from the Electron main process
+  useEffect(() => {
+    if (!electron.onScanComplete) return;
+    electron.onScanComplete((result) => {
+      setLastScanResult(result);
+      void refetchAudio();
+    });
+    return () => {
+      electron.removeAllListeners?.("music-scan-complete");
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSave = (partial: Parameters<typeof updateSettings>[0]) => {
     updateSettings(partial);
@@ -80,33 +99,57 @@ export default function Settings() {
       const folder = await electron.selectFolder();
       if (!folder) return;
       handleSave({ musicasFolder: folder });
-      // Tell the API server to start watching the new folder
-      await fetch(`${getApiBase()}/api/audio/watch-folder`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ folder }),
-      });
+
+      if (electron.setMusicFolder) {
+        await electron.setMusicFolder(folder);
+      } else {
+        await fetch(`${getApiBase()}/api/audio/watch-folder`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ folder }),
+        });
+      }
       await refetchAudio();
     } finally {
       setFolderChanging(false);
     }
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const dataUrl = ev.target?.result as string;
-      handleSave({ logoUrl: dataUrl });
-    };
-    reader.readAsDataURL(file);
+  const handleScanAudio = async () => {
+    setScanning(true);
+    setLastScanResult(null);
+    try {
+      let result: { scanned: number; linked: number; lyrics?: number; removed?: number };
+
+      if (electron.scanMusic) {
+        result = await electron.scanMusic();
+      } else {
+        const resp = await fetch(`${getApiBase()}/api/audio/scan`, { method: "POST" });
+        result = await resp.json();
+      }
+
+      setLastScanResult({
+        scanned: result.scanned,
+        linked: result.linked,
+        lyrics: result.lyrics ?? 0,
+        removed: result.removed ?? 0,
+      });
+      await refetchAudio();
+    } finally {
+      setScanning(false);
+    }
   };
 
-  const handleScanAudio = async () => {
-    await scanAudio.mutateAsync(undefined as unknown as void);
-    refetchAudio();
+  const handleOpenFolder = async () => {
+    if (electron.openMusicFolder) {
+      await electron.openMusicFolder();
+    }
   };
+
+  const mp3Count = audioFiles?.filter((f) => f.type === "mp3").length ?? 0;
+  const pbCount = audioFiles?.filter((f) => f.type === "pb").length ?? 0;
+  const lyricsCount = audioFiles?.filter((f) => f.type === "lyrics").length ?? 0;
+  const linkedCount = audioFiles?.filter((f) => f.songId != null).length ?? 0;
 
   return (
     <MainLayout>
@@ -182,7 +225,13 @@ export default function Settings() {
                       <p className="text-xs text-muted-foreground">PNG, JPG ou SVG. Máx. 2MB.</p>
                     </div>
                   </div>
-                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (ev) => handleSave({ logoUrl: ev.target?.result as string });
+                    reader.readAsDataURL(file);
+                  }} />
                 </div>
               </CardContent>
             </Card>
@@ -200,10 +249,7 @@ export default function Settings() {
                   {themes.map((t) => (
                     <button
                       key={t.id}
-                      onClick={() => {
-                        setTheme(t.id);
-                        handleSave({ theme: t.id });
-                      }}
+                      onClick={() => { setTheme(t.id); handleSave({ theme: t.id }); }}
                       className={cn(
                         "rounded-xl border-2 overflow-hidden transition-all text-left",
                         theme === t.id
@@ -215,9 +261,7 @@ export default function Settings() {
                       <div className="p-3 bg-card">
                         <div className="font-semibold text-sm">{t.label}</div>
                         <div className="text-xs text-muted-foreground mt-0.5">{t.desc}</div>
-                        {theme === t.id && (
-                          <Badge className="mt-2 text-xs">Ativo</Badge>
-                        )}
+                        {theme === t.id && <Badge className="mt-2 text-xs">Ativo</Badge>}
                       </div>
                     </button>
                   ))}
@@ -240,9 +284,7 @@ export default function Settings() {
                     {fontSizes.map((fs) => (
                       <button
                         key={fs.id}
-                        onClick={() => {
-                          handleSave({ projectionFontSize: fs.id });
-                        }}
+                        onClick={() => handleSave({ projectionFontSize: fs.id })}
                         className={cn(
                           "flex-1 py-2 rounded-lg border text-sm font-medium transition-all",
                           settings.projectionFontSize === fs.id
@@ -262,9 +304,7 @@ export default function Settings() {
                     {backgrounds.map((bg) => (
                       <button
                         key={bg.id}
-                        onClick={() => {
-                          handleSave({ projectionBackground: bg.id });
-                        }}
+                        onClick={() => handleSave({ projectionBackground: bg.id })}
                         className={cn(
                           "flex-1 py-2 rounded-lg border text-sm font-medium transition-all",
                           settings.projectionBackground === bg.id
@@ -284,9 +324,7 @@ export default function Settings() {
                     {transitions.map((tr) => (
                       <button
                         key={tr.id}
-                        onClick={() => {
-                          handleSave({ projectionTransition: tr.id });
-                        }}
+                        onClick={() => handleSave({ projectionTransition: tr.id })}
                         className={cn(
                           "flex-1 py-2 rounded-lg border text-sm font-medium transition-all",
                           settings.projectionTransition === tr.id
@@ -344,62 +382,124 @@ export default function Settings() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Music2 className="w-5 h-5 text-primary" />
-                  Pasta de Músicas (MP3)
+                  Biblioteca de Músicas
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+
+                {/* Folder path display */}
                 <div className="flex items-center gap-3 bg-background border border-border rounded-lg px-4 py-3">
                   <FolderOpen className="w-5 h-5 text-muted-foreground shrink-0" />
                   <code className="text-sm text-muted-foreground flex-1 truncate">
                     {settings.musicasFolder || "config/musicas"}
                   </code>
-                  <Badge variant="outline" className="text-xs shrink-0">
-                    {audioFiles?.length ?? 0} arquivo(s)
-                  </Badge>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {mp3Count > 0 && (
+                      <Badge variant="secondary" className="text-xs">{mp3Count} MP3</Badge>
+                    )}
+                    {pbCount > 0 && (
+                      <Badge variant="outline" className="text-xs border-blue-500/50 text-blue-400">{pbCount} PB</Badge>
+                    )}
+                    {lyricsCount > 0 && (
+                      <Badge variant="outline" className="text-xs border-yellow-500/50 text-yellow-400">{lyricsCount} TXT</Badge>
+                    )}
+                  </div>
                 </div>
 
+                {/* Instructions */}
                 {electron.isElectron ? (
                   <p className="text-sm text-muted-foreground">
                     Clique em <strong>Selecionar Pasta</strong> para escolher a pasta com seus MP3.
-                    Os arquivos são vinculados automaticamente pelo nome.
+                    Arquivos com <code className="bg-muted px-1 rounded text-xs">- PB.mp3</code> são detectados como playback.
+                    Arquivos <code className="bg-muted px-1 rounded text-xs">.txt</code> são importados como letras.
                   </p>
                 ) : (
                   <p className="text-sm text-muted-foreground">
                     Coloque arquivos MP3 na pasta{" "}
-                    <code className="bg-muted px-1 rounded text-xs">config/musicas/</code> no servidor.
-                    O nome do arquivo deve corresponder ao título da música para vinculação automática.
+                    <code className="bg-muted px-1 rounded text-xs">config/musicas/</code> (subpastas são incluídas).
+                    Adicione <code className="bg-muted px-1 rounded text-xs">- PB.mp3</code> ao nome para marcar como playback.
                   </p>
                 )}
 
+                {/* Action buttons */}
                 <div className="flex gap-3 flex-wrap">
                   {electron.isElectron && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleSelectFolder}
-                      disabled={folderChanging}
-                    >
-                      <HardDrive className={cn("w-4 h-4 mr-2", folderChanging && "animate-pulse")} />
-                      {folderChanging ? "Selecionando..." : "Selecionar Pasta"}
-                    </Button>
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSelectFolder}
+                        disabled={folderChanging}
+                      >
+                        <HardDrive className={cn("w-4 h-4 mr-2", folderChanging && "animate-pulse")} />
+                        {folderChanging ? "Selecionando..." : "Selecionar Pasta"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleOpenFolder}
+                      >
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        Abrir no Explorer
+                      </Button>
+                    </>
                   )}
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handleScanAudio}
-                    disabled={scanAudio.isPending}
+                    disabled={scanning}
                   >
-                    <RefreshCw className={cn("w-4 h-4 mr-2", scanAudio.isPending && "animate-spin")} />
-                    {scanAudio.isPending ? "Escaneando..." : "Escanear e Vincular"}
+                    <RefreshCw className={cn("w-4 h-4 mr-2", scanning && "animate-spin")} />
+                    {scanning ? "Escaneando..." : "Escanear e Vincular"}
                   </Button>
                 </div>
 
+                {/* Last scan result */}
+                {lastScanResult && (
+                  <div className="flex items-center gap-4 text-sm bg-primary/5 border border-primary/20 rounded-lg px-4 py-3">
+                    <CheckCircle className="w-4 h-4 text-primary shrink-0" />
+                    <span className="text-muted-foreground">
+                      Escaneados: <strong className="text-foreground">{lastScanResult.scanned}</strong>
+                      {" · "}Vinculados: <strong className="text-foreground">{lastScanResult.linked}</strong>
+                      {lastScanResult.lyrics > 0 && (
+                        <>{" · "}Letras: <strong className="text-foreground">{lastScanResult.lyrics}</strong></>
+                      )}
+                      {lastScanResult.removed > 0 && (
+                        <>{" · "}Removidos: <strong className="text-foreground">{lastScanResult.removed}</strong></>
+                      )}
+                    </span>
+                  </div>
+                )}
+
+                {/* File list */}
                 {audioFiles && audioFiles.length > 0 && (
                   <div className="mt-2 border border-border rounded-lg overflow-hidden">
+                    {/* Summary stats row */}
+                    {linkedCount > 0 && (
+                      <div className="px-4 py-2 bg-muted/30 border-b border-border/50 flex items-center gap-3 text-xs text-muted-foreground">
+                        <span>{audioFiles.length} arquivo(s) indexado(s)</span>
+                        <span>·</span>
+                        <span className="text-primary font-medium">{linkedCount} vinculado(s)</span>
+                        {audioFiles.length - linkedCount > 0 && (
+                          <>
+                            <span>·</span>
+                            <span>{audioFiles.length - linkedCount} sem vínculo</span>
+                          </>
+                        )}
+                      </div>
+                    )}
                     {audioFiles.slice(0, 15).map((f) => (
-                      <div key={f.path ?? f.filename} className="flex items-center justify-between px-4 py-2.5 border-b border-border/50 last:border-0 hover:bg-white/5">
+                      <div
+                        key={f.path ?? f.filename}
+                        className="flex items-center justify-between px-4 py-2.5 border-b border-border/50 last:border-0 hover:bg-white/5"
+                      >
                         <div className="flex items-center gap-3 min-w-0">
-                          <Music2 className="w-4 h-4 text-muted-foreground shrink-0" />
+                          {f.type === "lyrics" ? (
+                            <FileText className="w-4 h-4 text-yellow-500/70 shrink-0" />
+                          ) : (
+                            <Music2 className="w-4 h-4 text-muted-foreground shrink-0" />
+                          )}
                           <div className="min-w-0">
                             <div className="text-sm font-medium truncate">{f.title}</div>
                             <div className="text-xs text-muted-foreground truncate">{f.filename}</div>
@@ -412,7 +512,7 @@ export default function Settings() {
                           {f.type === "lyrics" && (
                             <Badge variant="outline" className="text-xs border-yellow-500/50 text-yellow-400">Letra</Badge>
                           )}
-                          {f.songId ? (
+                          {f.songId != null ? (
                             <Badge className="text-xs">Vinculado</Badge>
                           ) : (
                             <Badge variant="outline" className="text-xs text-muted-foreground">Não vinculado</Badge>

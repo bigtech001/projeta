@@ -8,6 +8,7 @@ import {
 } from "electron";
 import { spawn, ChildProcess } from "child_process";
 import http from "http";
+import fs from "fs";
 import path from "path";
 import { createMenu } from "./menu";
 
@@ -15,7 +16,6 @@ import { createMenu } from "./menu";
 
 const isDev = !app.isPackaged || process.env.NODE_ENV === "development";
 const API_PORT = 8080;
-// In dev, the Vite dev server runs separately; in production, Express serves everything
 const DEV_FRONTEND = `http://localhost:20976`;
 const PROD_FRONTEND = `http://localhost:${API_PORT}`;
 const APP_URL = isDev ? DEV_FRONTEND : PROD_FRONTEND;
@@ -27,16 +27,37 @@ let projectionWindow: BrowserWindow | null = null;
 let stageWindow: BrowserWindow | null = null;
 let apiServerProcess: ChildProcess | null = null;
 
+// ── Music folder ──────────────────────────────────────────────────────────────
+
+/**
+ * Resolves the music folder path.
+ * - Production: <userData>/musicas  (user-writable, survives app updates)
+ * - Development: config/musicas (relative to CWD for easy file dropping)
+ */
+function getMusicFolder(): string {
+  if (isDev) {
+    return path.resolve(process.cwd(), "config", "musicas");
+  }
+  return path.join(app.getPath("userData"), "musicas");
+}
+
+function ensureMusicFolder(): void {
+  const folder = getMusicFolder();
+  if (!fs.existsSync(folder)) {
+    fs.mkdirSync(folder, { recursive: true });
+  }
+}
+
 // ── API server lifecycle ──────────────────────────────────────────────────────
 
 function startApiServer(): void {
   const dbPath = path.join(app.getPath("userData"), "churchlive.db");
+  const musicFolder = getMusicFolder();
+  ensureMusicFolder();
 
   const serverPath = isDev
     ? path.resolve(__dirname, "../../api-server/dist/index.mjs")
     : path.join(process.resourcesPath, "api-server", "dist", "index.mjs");
-
-  const musicFolder = path.join(app.getPath("userData"), "musicas");
 
   apiServerProcess = spawn("node", ["--enable-source-maps", serverPath], {
     env: {
@@ -86,6 +107,38 @@ function waitForServer(port: number, attempts = 30): Promise<void> {
   });
 }
 
+// ── API helper ────────────────────────────────────────────────────────────────
+
+function apiPost(urlPath: string, body: unknown): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const data = JSON.stringify(body);
+    const req = http.request(
+      {
+        hostname: "localhost",
+        port: API_PORT,
+        path: urlPath,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(data),
+        },
+        timeout: 30000,
+      },
+      (res) => {
+        let raw = "";
+        res.on("data", (chunk) => { raw += chunk; });
+        res.on("end", () => {
+          try { resolve(JSON.parse(raw)); } catch { resolve(raw); }
+        });
+      }
+    );
+    req.on("error", reject);
+    req.on("timeout", () => { req.destroy(); reject(new Error("Request timed out")); });
+    req.write(data);
+    req.end();
+  });
+}
+
 // ── Window factories ──────────────────────────────────────────────────────────
 
 function createMainWindow(): void {
@@ -105,7 +158,6 @@ function createMainWindow(): void {
     },
   });
 
-  // Intercept window.open() calls from the renderer to create proper BrowserWindows
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     handleWindowOpen(url);
     return { action: "deny" };
@@ -171,6 +223,7 @@ function handleWindowOpen(url: string): void {
 // ── IPC handlers ──────────────────────────────────────────────────────────────
 
 function setupIPC(): void {
+  // ── Folder picker ──────────────────────────────────────────────────────────
   ipcMain.handle("dialog:selectFolder", async () => {
     const win = mainWindow ?? BrowserWindow.getFocusedWindow();
     if (!win) return null;
@@ -178,29 +231,66 @@ function setupIPC(): void {
       properties: ["openDirectory"],
       title: "Selecionar Pasta de Músicas",
       buttonLabel: "Selecionar Pasta",
+      defaultPath: getMusicFolder(),
     });
     return result.canceled ? null : result.filePaths[0];
   });
 
-  ipcMain.handle("window:openProjection", () => {
-    createProjectionWindow();
+  // ── Music folder helpers ───────────────────────────────────────────────────
+  ipcMain.handle("music:getFolder", () => getMusicFolder());
+
+  ipcMain.handle("music:openFolder", async () => {
+    const folder = getMusicFolder();
+    ensureMusicFolder();
+    await shell.openPath(folder);
   });
 
-  ipcMain.handle("window:openStage", () => {
-    createStageWindow();
+  // ── Trigger a full recursive scan via the API server ──────────────────────
+  ipcMain.handle("music:scan", async (_event, folder?: string) => {
+    const targetFolder = folder ?? getMusicFolder();
+    try {
+      const result = await apiPost("/api/audio/scan", { folder: targetFolder });
+      // Notify all renderer windows so they can refetch
+      BrowserWindow.getAllWindows().forEach((win) => {
+        win.webContents.send("music-scan-complete", result);
+      });
+      return result;
+    } catch (err) {
+      console.error("[ChurchLive] music:scan error:", err);
+      throw err;
+    }
   });
+
+  // ── Update watch folder in API server ─────────────────────────────────────
+  ipcMain.handle("music:setFolder", async (_event, folder: string) => {
+    try {
+      fs.mkdirSync(folder, { recursive: true });
+      await apiPost("/api/audio/watch-folder", { folder });
+      return { ok: true, folder };
+    } catch (err) {
+      console.error("[ChurchLive] music:setFolder error:", err);
+      throw err;
+    }
+  });
+
+  // ── Window management ──────────────────────────────────────────────────────
+  ipcMain.handle("window:openProjection", () => { createProjectionWindow(); });
+  ipcMain.handle("window:openStage", () => { createStageWindow(); });
 
   ipcMain.handle("window:setFullscreen", (_event, flag: boolean) => {
     (BrowserWindow.getFocusedWindow() ?? mainWindow)?.setFullScreen(flag);
   });
 
+  // ── App info ───────────────────────────────────────────────────────────────
   ipcMain.handle("app:getVersion", () => app.getVersion());
+  ipcMain.handle("app:getUserDataPath", () => app.getPath("userData"));
 }
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 
 app.whenReady().then(async () => {
-  // In production, we manage the API server process ourselves
+  ensureMusicFolder();
+
   if (!isDev) {
     startApiServer();
     try {

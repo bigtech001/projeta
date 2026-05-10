@@ -1,22 +1,35 @@
-// Detect if running inside Electron by checking for the contextBridge API
 const _isElectron =
   typeof window !== "undefined" && "electronAPI" in window;
+
+type ScanResult = {
+  scanned: number;
+  linked: number;
+  lyrics: number;
+  removed: number;
+};
 
 type ElectronAPI = {
   isElectron: true;
   platform: string;
+
   selectFolder: () => Promise<string | null>;
+  getMusicFolder: () => Promise<string>;
+  openMusicFolder: () => Promise<void>;
+  getUserDataPath: () => Promise<string>;
+
+  scanMusic: (folder?: string) => Promise<ScanResult>;
+  setMusicFolder: (folder: string) => Promise<{ ok: boolean; folder: string }>;
+
   openProjectionWindow: () => Promise<void>;
   openStageWindow: () => Promise<void>;
   setFullscreen: (flag: boolean) => Promise<void>;
   getVersion: () => Promise<string>;
+
   onMusicIndexed: (
-    callback: (data: {
-      songId: number;
-      title: string;
-      filePath: string;
-    }) => void
+    callback: (data: { songId: number; title: string; filePath: string }) => void
   ) => void;
+  onScanComplete: (callback: (result: ScanResult) => void) => void;
+  removeAllListeners: (channel: string) => void;
 };
 
 function getAPI(): ElectronAPI | null {
@@ -26,15 +39,15 @@ function getAPI(): ElectronAPI | null {
 
 /**
  * Returns the API base URL for direct HTTP requests.
- * - In Electron the API runs on a separate port (8080).
- * - In the browser (Replit) requests go through the shared reverse proxy at root.
+ * - In Electron the API runs on a dedicated port (8080).
+ * - In the browser requests go through the shared reverse proxy at root.
  */
 export function getApiBase(): string {
   if (_isElectron) return "http://localhost:8080";
   return "";
 }
 
-/** Hook that exposes Electron IPC helpers when available, no-ops in the browser. */
+/** Hook that exposes Electron IPC helpers; returns null stubs in the browser. */
 export function useElectron() {
   const api = getAPI();
 
@@ -42,19 +55,20 @@ export function useElectron() {
     isElectron: _isElectron,
     platform: api?.platform ?? "web",
 
-    /** Open the native folder-picker dialog. Returns path or null if cancelled. */
     selectFolder: api?.selectFolder ?? null,
+    getMusicFolder: api?.getMusicFolder ?? null,
+    openMusicFolder: api?.openMusicFolder ?? null,
+    getUserDataPath: api?.getUserDataPath ?? null,
 
-    /** Open a dedicated fullscreen projection BrowserWindow. */
+    scanMusic: api?.scanMusic ?? null,
+    setMusicFolder: api?.setMusicFolder ?? null,
+
     openProjectionWindow: api?.openProjectionWindow ?? null,
-
-    /** Open the stage monitor BrowserWindow. */
     openStageWindow: api?.openStageWindow ?? null,
-
-    /** Toggle fullscreen on the main window. */
     setFullscreen: api?.setFullscreen ?? null,
 
-    /** Register a listener for music-file indexing events (Electron only). */
     onMusicIndexed: api?.onMusicIndexed ?? null,
+    onScanComplete: api?.onScanComplete ?? null,
+    removeAllListeners: api?.removeAllListeners ?? null,
   };
 }

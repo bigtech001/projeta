@@ -1,6 +1,6 @@
 {
   "name": "@workspace/electron",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "description": "ChurchLive — Electron desktop wrapper",
   "main": "dist/main.js",
@@ -8,6 +8,9 @@
     "build": "tsc -p tsconfig.json",
     "dev": "NODE_ENV=development electron dist/main.js",
     "pack": "pnpm run build && electron-builder --dir",
+    "dist:win": "pnpm run build && electron-builder --win",
+    "dist:mac": "pnpm run build && electron-builder --mac",
+    "dist:linux": "pnpm run build && electron-builder --linux",
     "dist": "pnpm run build && electron-builder",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
@@ -23,26 +26,6 @@
   "build": {
     "appId": "com.churchlive.app",
     "productName": "ChurchLive",
-    "directories": {
-      "output": "dist-electron"
-    },
-    "extraResources": [
-      {
-        "from": "../api-server/dist",
-        "to": "api-server/dist",
-        "filter": ["**/*"]
-      }
-    ],
-    "mac": {
-      "category": "public.app-category.music",
-      "target": "dmg"
-    },
-    "win": {
-      "target": "nsis"
-    },
-    "linux": {
-      "target": "AppImage",
-      "category": "AudioVideo"
-    }
+    "extends": "./electron-builder.yml"
   }
 }

@@ -1,0 +1,5 @@
+ChurchLive - Software de Projeção para Igrejas
+
+Copyright © 2024 ChurchLive
+
+Este software é fornecido gratuitamente para uso em igrejas e ministérios.
