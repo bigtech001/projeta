@@ -885,10 +885,21 @@ components:
           type: string
         path:
           type: string
+        type:
+          type: string
+          enum: [mp3, pb, lyrics]
         songId:
           type: integer
           nullable: true
-      required: [filename, title, path]
+        sizeBytes:
+          type: integer
+          nullable: true
+        lastModified:
+          type: string
+          nullable: true
+        indexedAt:
+          type: string
+      required: [filename, title, path, type]
 
     AudioScanResult:
       type: object
@@ -896,6 +907,10 @@ components:
         scanned:
           type: integer
         linked:
+          type: integer
+        lyrics:
+          type: integer
+        removed:
           type: integer
       required: [scanned, linked]
 

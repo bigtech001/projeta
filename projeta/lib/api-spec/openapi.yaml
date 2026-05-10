@@ -1,0 +1,923 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: Church Projection API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: songs
+    description: Song management
+  - name: collections
+    description: Music collections
+  - name: liturgy
+    description: Liturgy / service order
+  - name: bible
+    description: Bible verses
+  - name: projection
+    description: Projection control
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /songs:
+    get:
+      operationId: listSongs
+      tags: [songs]
+      summary: List all songs
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: collectionId
+          in: query
+          schema:
+            type: integer
+        - name: category
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Songs list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Song"
+    post:
+      operationId: createSong
+      tags: [songs]
+      summary: Create a song
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSongBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Song"
+
+  /songs/{id}:
+    get:
+      operationId: getSong
+      tags: [songs]
+      summary: Get a song by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Song
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Song"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: updateSong
+      tags: [songs]
+      summary: Update a song
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSongBody"
+      responses:
+        "200":
+          description: Updated song
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Song"
+    delete:
+      operationId: deleteSong
+      tags: [songs]
+      summary: Delete a song
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /songs/{id}/verses:
+    get:
+      operationId: getSongVerses
+      tags: [songs]
+      summary: Get parsed verses of a song
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Verses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SongVerse"
+
+  /collections:
+    get:
+      operationId: listCollections
+      tags: [collections]
+      summary: List all collections
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Collections
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Collection"
+    post:
+      operationId: createCollection
+      tags: [collections]
+      summary: Create a collection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCollectionBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Collection"
+
+  /collections/{id}:
+    get:
+      operationId: getCollection
+      tags: [collections]
+      summary: Get collection with songs
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Collection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollectionWithSongs"
+
+  /liturgies:
+    get:
+      operationId: listLiturgies
+      tags: [liturgy]
+      summary: List liturgies
+      responses:
+        "200":
+          description: Liturgies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Liturgy"
+    post:
+      operationId: createLiturgy
+      tags: [liturgy]
+      summary: Create a liturgy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLiturgyBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Liturgy"
+
+  /liturgies/{id}:
+    get:
+      operationId: getLiturgy
+      tags: [liturgy]
+      summary: Get liturgy with items
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Liturgy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiturgyWithItems"
+    put:
+      operationId: updateLiturgy
+      tags: [liturgy]
+      summary: Update a liturgy
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLiturgyBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiturgyWithItems"
+    delete:
+      operationId: deleteLiturgy
+      tags: [liturgy]
+      summary: Delete a liturgy
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /liturgies/{id}/items:
+    post:
+      operationId: addLiturgyItem
+      tags: [liturgy]
+      summary: Add item to liturgy
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLiturgyItemBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiturgyItem"
+
+  /liturgy-items/{id}:
+    put:
+      operationId: updateLiturgyItem
+      tags: [liturgy]
+      summary: Update a liturgy item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLiturgyItemBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiturgyItem"
+    delete:
+      operationId: deleteLiturgyItem
+      tags: [liturgy]
+      summary: Delete a liturgy item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /bible/books:
+    get:
+      operationId: listBibleBooks
+      tags: [bible]
+      summary: List all Bible books
+      responses:
+        "200":
+          description: Books
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BibleBook"
+
+  /bible/search:
+    get:
+      operationId: searchBible
+      tags: [bible]
+      summary: Search Bible verses
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: book
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Verses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BibleVerse"
+
+  /bible/{book}/{chapter}:
+    get:
+      operationId: getBibleChapter
+      tags: [bible]
+      summary: Get a Bible chapter
+      parameters:
+        - name: book
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: chapter
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Chapter verses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BibleVerse"
+
+  /projection/state:
+    get:
+      operationId: getProjectionState
+      tags: [projection]
+      summary: Get current projection state
+      responses:
+        "200":
+          description: Projection state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectionState"
+
+  /projection/control:
+    post:
+      operationId: controlProjection
+      tags: [projection]
+      summary: Send projection command
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectionCommand"
+      responses:
+        "200":
+          description: New state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectionState"
+
+  /audio/files:
+    get:
+      operationId: listAudioFiles
+      tags: [songs]
+      summary: List MP3 files from config/musicas folder
+      responses:
+        "200":
+          description: Audio files
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AudioFile"
+
+  /audio/scan:
+    post:
+      operationId: scanAudioFiles
+      tags: [songs]
+      summary: Scan and link MP3 files to songs
+      responses:
+        "200":
+          description: Scan result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AudioScanResult"
+
+  /stats/overview:
+    get:
+      operationId: getStatsOverview
+      tags: [songs]
+      summary: Get dashboard overview stats
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatsOverview"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required: [status]
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+
+    Song:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        author:
+          type: string
+        lyrics:
+          type: string
+        mp3Path:
+          type: string
+          nullable: true
+        key:
+          type: string
+          nullable: true
+        bpm:
+          type: integer
+          nullable: true
+        category:
+          type: string
+          nullable: true
+        collectionId:
+          type: integer
+          nullable: true
+        collectionName:
+          type: string
+          nullable: true
+        coverImage:
+          type: string
+          nullable: true
+        isFavorite:
+          type: boolean
+        createdAt:
+          type: string
+      required: [id, title, author, lyrics, isFavorite, createdAt]
+
+    SongVerse:
+      type: object
+      properties:
+        index:
+          type: integer
+        label:
+          type: string
+        lines:
+          type: array
+          items:
+            type: string
+      required: [index, label, lines]
+
+    CreateSongBody:
+      type: object
+      properties:
+        title:
+          type: string
+        author:
+          type: string
+        lyrics:
+          type: string
+        mp3Path:
+          type: string
+        key:
+          type: string
+        bpm:
+          type: integer
+        category:
+          type: string
+        collectionId:
+          type: integer
+        coverImage:
+          type: string
+      required: [title, author, lyrics]
+
+    UpdateSongBody:
+      type: object
+      properties:
+        title:
+          type: string
+        author:
+          type: string
+        lyrics:
+          type: string
+        mp3Path:
+          type: string
+        key:
+          type: string
+        bpm:
+          type: integer
+        category:
+          type: string
+        collectionId:
+          type: integer
+        coverImage:
+          type: string
+        isFavorite:
+          type: boolean
+
+    Collection:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        coverImage:
+          type: string
+          nullable: true
+        songCount:
+          type: integer
+        createdAt:
+          type: string
+      required: [id, name, songCount, createdAt]
+
+    CollectionWithSongs:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        coverImage:
+          type: string
+          nullable: true
+        songs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Song"
+        createdAt:
+          type: string
+      required: [id, name, songs, createdAt]
+
+    CreateCollectionBody:
+      type: object
+      properties:
+        name:
+          type: string
+        coverImage:
+          type: string
+      required: [name]
+
+    Liturgy:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        serviceDate:
+          type: string
+          nullable: true
+        totalDurationMinutes:
+          type: integer
+        itemCount:
+          type: integer
+        createdAt:
+          type: string
+      required: [id, title, totalDurationMinutes, itemCount, createdAt]
+
+    LiturgyItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        liturgyId:
+          type: integer
+        type:
+          type: string
+          enum: [louvor, oracao, biblia, mensagem, pregacao, anuncio, outro]
+        title:
+          type: string
+        details:
+          type: string
+          nullable: true
+        durationMinutes:
+          type: integer
+        order:
+          type: integer
+        songId:
+          type: integer
+          nullable: true
+      required: [id, liturgyId, type, title, durationMinutes, order]
+
+    LiturgyWithItems:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        serviceDate:
+          type: string
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LiturgyItem"
+        totalDurationMinutes:
+          type: integer
+        createdAt:
+          type: string
+      required: [id, title, items, totalDurationMinutes, createdAt]
+
+    CreateLiturgyBody:
+      type: object
+      properties:
+        title:
+          type: string
+        serviceDate:
+          type: string
+      required: [title]
+
+    UpdateLiturgyBody:
+      type: object
+      properties:
+        title:
+          type: string
+        serviceDate:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreateLiturgyItemBody"
+
+    CreateLiturgyItemBody:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [louvor, oracao, biblia, mensagem, pregacao, anuncio, outro]
+        title:
+          type: string
+        details:
+          type: string
+        durationMinutes:
+          type: integer
+        order:
+          type: integer
+        songId:
+          type: integer
+      required: [type, title, durationMinutes, order]
+
+    UpdateLiturgyItemBody:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [louvor, oracao, biblia, mensagem, pregacao, anuncio, outro]
+        title:
+          type: string
+        details:
+          type: string
+        durationMinutes:
+          type: integer
+        order:
+          type: integer
+
+    BibleBook:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        testament:
+          type: string
+          enum: [old, new]
+        chapterCount:
+          type: integer
+      required: [id, name, testament, chapterCount]
+
+    BibleVerse:
+      type: object
+      properties:
+        book:
+          type: string
+        bookName:
+          type: string
+        chapter:
+          type: integer
+        verse:
+          type: integer
+        text:
+          type: string
+        reference:
+          type: string
+      required: [book, bookName, chapter, verse, text, reference]
+
+    ProjectionState:
+      type: object
+      properties:
+        isActive:
+          type: boolean
+        mode:
+          type: string
+          enum: [blank, song, bible, announcement]
+          nullable: true
+        currentSongId:
+          type: integer
+          nullable: true
+        currentSongTitle:
+          type: string
+          nullable: true
+        currentVerseIndex:
+          type: integer
+          nullable: true
+        currentVerseLine:
+          type: string
+          nullable: true
+        nextVerseLine:
+          type: string
+          nullable: true
+        totalVerses:
+          type: integer
+          nullable: true
+        bibleVerse:
+          type: string
+          nullable: true
+        bibleReference:
+          type: string
+          nullable: true
+        announcement:
+          type: string
+          nullable: true
+        isAudioPlaying:
+          type: boolean
+        audioVolume:
+          type: number
+        currentLiturgyId:
+          type: integer
+          nullable: true
+      required: [isActive, isAudioPlaying, audioVolume]
+
+    ProjectionCommand:
+      type: object
+      properties:
+        action:
+          type: string
+          enum: [show_song, next_verse, prev_verse, blank, show_bible, show_announcement, play_audio, pause_audio, stop_audio, set_volume, set_liturgy]
+        songId:
+          type: integer
+        verseIndex:
+          type: integer
+        bibleVerse:
+          type: string
+        bibleReference:
+          type: string
+        announcement:
+          type: string
+        volume:
+          type: number
+        liturgyId:
+          type: integer
+      required: [action]
+
+    AudioFile:
+      type: object
+      properties:
+        filename:
+          type: string
+        title:
+          type: string
+        path:
+          type: string
+        songId:
+          type: integer
+          nullable: true
+      required: [filename, title, path]
+
+    AudioScanResult:
+      type: object
+      properties:
+        scanned:
+          type: integer
+        linked:
+          type: integer
+      required: [scanned, linked]
+
+    StatsOverview:
+      type: object
+      properties:
+        totalSongs:
+          type: integer
+        totalCollections:
+          type: integer
+        totalLiturgies:
+          type: integer
+        recentSongs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Song"
+        favoriteSongs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Song"
+        topCollections:
+          type: array
+          items:
+            $ref: "#/components/schemas/Collection"
+      required: [totalSongs, totalCollections, totalLiturgies, recentSongs, favoriteSongs, topCollections]

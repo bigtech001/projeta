@@ -36,11 +36,14 @@ function startApiServer(): void {
     ? path.resolve(__dirname, "../../api-server/dist/index.mjs")
     : path.join(process.resourcesPath, "api-server", "dist", "index.mjs");
 
+  const musicFolder = path.join(app.getPath("userData"), "musicas");
+
   apiServerProcess = spawn("node", ["--enable-source-maps", serverPath], {
     env: {
       ...process.env,
       PORT: String(API_PORT),
       DB_PATH: dbPath,
+      MUSIC_FOLDER: musicFolder,
       NODE_ENV: isDev ? "development" : "production",
     },
     stdio: "inherit",

@@ -396,25 +396,33 @@ export default function Settings() {
 
                 {audioFiles && audioFiles.length > 0 && (
                   <div className="mt-2 border border-border rounded-lg overflow-hidden">
-                    {audioFiles.slice(0, 10).map((f) => (
-                      <div key={f.filename} className="flex items-center justify-between px-4 py-2.5 border-b border-border/50 last:border-0 hover:bg-white/5">
-                        <div className="flex items-center gap-3">
+                    {audioFiles.slice(0, 15).map((f) => (
+                      <div key={f.path ?? f.filename} className="flex items-center justify-between px-4 py-2.5 border-b border-border/50 last:border-0 hover:bg-white/5">
+                        <div className="flex items-center gap-3 min-w-0">
                           <Music2 className="w-4 h-4 text-muted-foreground shrink-0" />
-                          <div>
-                            <div className="text-sm font-medium">{f.title}</div>
-                            <div className="text-xs text-muted-foreground">{f.filename}</div>
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium truncate">{f.title}</div>
+                            <div className="text-xs text-muted-foreground truncate">{f.filename}</div>
                           </div>
                         </div>
-                        {f.songId ? (
-                          <Badge className="text-xs">Vinculado</Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-xs text-muted-foreground">Não vinculado</Badge>
-                        )}
+                        <div className="flex items-center gap-2 shrink-0 ml-2">
+                          {f.type === "pb" && (
+                            <Badge variant="outline" className="text-xs border-blue-500/50 text-blue-400">Playback</Badge>
+                          )}
+                          {f.type === "lyrics" && (
+                            <Badge variant="outline" className="text-xs border-yellow-500/50 text-yellow-400">Letra</Badge>
+                          )}
+                          {f.songId ? (
+                            <Badge className="text-xs">Vinculado</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs text-muted-foreground">Não vinculado</Badge>
+                          )}
+                        </div>
                       </div>
                     ))}
-                    {audioFiles.length > 10 && (
+                    {audioFiles.length > 15 && (
                       <div className="px-4 py-2 text-xs text-muted-foreground text-center">
-                        +{audioFiles.length - 10} arquivo(s) adicionais
+                        +{audioFiles.length - 15} arquivo(s) adicionais
                       </div>
                     )}
                   </div>

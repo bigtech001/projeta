@@ -3,89 +3,68 @@ import { stat as fsStat } from "fs/promises";
 import { createReadStream } from "fs";
 import fsp from "fs/promises";
 import path from "path";
-import { db, songsTable } from "@workspace/db";
+import { db, songsTable, musicFilesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { setMusicWatchFolder } from "../lib/music-indexer";
+import { setMusicWatchFolder, fullScan, getMusicWatchFolder } from "../lib/music-indexer";
 
 const router: IRouter = Router();
 
-const DEFAULT_MUSICAS_DIR = path.resolve(process.cwd(), "config", "musicas");
+const DEFAULT_MUSICAS_DIR = path.resolve(
+  process.cwd(),
+  "config",
+  "musicas"
+);
 
-// ── List all MP3 files and their song linkage ─────────────────────────────────
-router.get("/audio/files", async (req, res): Promise<void> => {
-  const folder = (req.query.folder as string | undefined) ?? DEFAULT_MUSICAS_DIR;
+// ── List all indexed music/lyric files ────────────────────────────────────────
+router.get("/audio/files", async (_req, res): Promise<void> => {
   try {
-    await fsp.mkdir(folder, { recursive: true });
-    const entries = await fsp.readdir(folder, { withFileTypes: true });
-    const mp3Files = entries
-      .filter((e) => e.isFile() && e.name.toLowerCase().endsWith(".mp3"))
-      .map((e) => {
-        const title = e.name.replace(/\.mp3$/i, "").replace(/[-_]/g, " ");
-        return {
-          filename: e.name,
-          title,
-          path: path.join(folder, e.name),
-          songId: null as number | null,
-        };
-      });
+    const rows = await db
+      .select({
+        id: musicFilesTable.id,
+        filePath: musicFilesTable.filePath,
+        filename: musicFilesTable.filename,
+        type: musicFilesTable.type,
+        songId: musicFilesTable.songId,
+        sizeBytes: musicFilesTable.sizeBytes,
+        lastModified: musicFilesTable.lastModified,
+        indexedAt: musicFilesTable.indexedAt,
+      })
+      .from(musicFilesTable)
+      .orderBy(musicFilesTable.filename);
 
-    if (mp3Files.length > 0) {
-      const dbSongs = await db
-        .select({ id: songsTable.id, title: songsTable.title })
-        .from(songsTable);
-      for (const file of mp3Files) {
-        const match = dbSongs.find(
-          (s) => s.title.toLowerCase() === file.title.toLowerCase()
-        );
-        if (match) file.songId = match.id;
-      }
-    }
+    const formatted = rows.map((r) => ({
+      filename: r.filename,
+      title: deriveTitleFromFilename(r.filename, r.type as "mp3" | "pb" | "lyrics"),
+      path: r.filePath,
+      type: r.type,
+      songId: r.songId ?? null,
+      sizeBytes: r.sizeBytes ?? null,
+      lastModified: r.lastModified ?? null,
+      indexedAt: r.indexedAt,
+    }));
 
-    res.json(mp3Files);
+    res.json(formatted);
   } catch {
     res.json([]);
   }
 });
 
-// ── Scan folder and auto-link MP3s to songs ───────────────────────────────────
+// ── Trigger a full recursive scan ─────────────────────────────────────────────
 router.post("/audio/scan", async (req, res): Promise<void> => {
-  const folder = (req.body?.folder as string | undefined) ?? DEFAULT_MUSICAS_DIR;
+  const folder =
+    (req.body?.folder as string | undefined) ??
+    getMusicWatchFolder() ??
+    DEFAULT_MUSICAS_DIR;
+
   try {
-    await fsp.mkdir(folder, { recursive: true });
-    const entries = await fsp.readdir(folder, { withFileTypes: true });
-    const mp3Files = entries.filter(
-      (e) => e.isFile() && e.name.toLowerCase().endsWith(".mp3")
-    );
-
-    const dbSongs = await db
-      .select({ id: songsTable.id, title: songsTable.title })
-      .from(songsTable);
-
-    let linked = 0;
-    for (const entry of mp3Files) {
-      const candidateTitle = entry.name
-        .replace(/\.mp3$/i, "")
-        .replace(/[-_]/g, " ")
-        .trim();
-      const match = dbSongs.find(
-        (s) => s.title.toLowerCase() === candidateTitle.toLowerCase()
-      );
-      if (match) {
-        await db
-          .update(songsTable)
-          .set({ mp3Path: path.join(folder, entry.name) })
-          .where(eq(songsTable.id, match.id));
-        linked++;
-      }
-    }
-
-    res.json({ scanned: mp3Files.length, linked });
+    const result = await fullScan(folder);
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: String(err) });
   }
 });
 
-// ── Set music watch folder (updates chokidar watcher) ────────────────────────
+// ── Set music watch folder (updates watcher + triggers scan) ──────────────────
 router.post("/audio/watch-folder", async (req, res): Promise<void> => {
   const { folder } = req.body as { folder?: string };
   if (!folder || typeof folder !== "string") {
@@ -153,5 +132,24 @@ router.get("/audio/stream/:id", async (req, res): Promise<void> => {
     createReadStream(song.mp3Path).pipe(res);
   }
 });
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function deriveTitleFromFilename(
+  filename: string,
+  type: "mp3" | "pb" | "lyrics"
+): string {
+  if (type === "pb") {
+    return filename
+      .replace(/\s*-\s*PB\.mp3$/i, "")
+      .replace(/\.mp3$/i, "")
+      .replace(/[-_]/g, " ")
+      .trim();
+  }
+  if (type === "mp3") {
+    return filename.replace(/\.mp3$/i, "").replace(/[-_]/g, " ").trim();
+  }
+  return filename.replace(/\.txt$/i, "").replace(/[-_]/g, " ").trim();
+}
 
 export default router;

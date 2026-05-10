@@ -1,0 +1,54 @@
+appId: com.churchlive.app
+productName: ChurchLive
+copyright: Copyright © 2024 ChurchLive
+
+directories:
+  output: dist-electron
+  buildResources: build-resources
+
+files:
+  - dist/**/*
+  - "!dist-electron"
+
+extraResources:
+  - from: "../api-server/dist"
+    to: "api-server/dist"
+  - from: "../../data"
+    to: "data"
+    filter:
+      - "**/*.db"
+
+asar: true
+
+mac:
+  category: public.app-category.music
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  darkModeSupport: true
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build-resources/icon.ico
+
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+  category: AudioVideo
+  icon: build-resources/icon.png
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+  installerLanguages:
+    - pt_BR
+    - en_US
+
+publish:
+  provider: github
+  releaseType: release

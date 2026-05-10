@@ -67,5 +67,19 @@ export function migrateDatabase(): void {
     );
 
     INSERT OR IGNORE INTO projection_state (id) VALUES (1);
+
+    CREATE TABLE IF NOT EXISTS music_files (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      file_path     TEXT    NOT NULL UNIQUE,
+      filename      TEXT    NOT NULL,
+      type          TEXT    NOT NULL DEFAULT 'mp3',
+      song_id       INTEGER REFERENCES songs(id) ON DELETE SET NULL,
+      size_bytes    INTEGER,
+      last_modified TEXT,
+      indexed_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_music_files_song_id ON music_files(song_id);
+    CREATE INDEX IF NOT EXISTS idx_music_files_type    ON music_files(type);
   `);
 }

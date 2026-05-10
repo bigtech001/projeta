@@ -1,105 +1,221 @@
-import chokidar from "chokidar";
+import fs from "fs/promises";
 import path from "path";
-import { db, songsTable } from "@workspace/db";
+import { db, songsTable, musicFilesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { broadcast } from "./websocket";
 import { logger } from "./logger";
 
-let watcher: chokidar.FSWatcher | null = null;
 let watchedFolder: string | null = null;
-
-/** Start watching a new music folder (stops any previous watcher first). */
-export function setMusicWatchFolder(folderPath: string): void {
-  if (watcher) {
-    void watcher.close();
-    watcher = null;
-  }
-  watchedFolder = folderPath;
-  startWatcher(folderPath);
-}
+let scanInProgress = false;
 
 export function getMusicWatchFolder(): string | null {
   return watchedFolder;
 }
 
-/** Bootstrap the indexer with the default or env-configured folder. */
-export function initMusicIndexer(): void {
-  const folder =
-    process.env.MUSIC_FOLDER ?? path.resolve(process.cwd(), "config", "musicas");
-  logger.info({ folder }, "Initialising music indexer");
-  setMusicWatchFolder(folder);
+export function setMusicWatchFolder(folderPath: string): void {
+  watchedFolder = folderPath;
+  void fullScan(folderPath);
 }
 
-// ── Internal helpers ──────────────────────────────────────────────────────────
+export function initMusicIndexer(): void {
+  const folder =
+    process.env["MUSIC_FOLDER"] ??
+    path.resolve(process.cwd(), "config", "musicas");
+  logger.info({ folder }, "Initialising music indexer");
+  watchedFolder = folder;
+  void fullScan(folder);
+}
 
-async function indexFile(filePath: string): Promise<void> {
-  if (!filePath.toLowerCase().endsWith(".mp3")) return;
+// ── File classification ────────────────────────────────────────────────────────
 
-  const candidateTitle = path
-    .basename(filePath)
-    .replace(/\.mp3$/i, "")
-    .replace(/[-_]/g, " ")
-    .trim();
+type FileType = "mp3" | "pb" | "lyrics";
+
+/**
+ * Classify a file by its name.
+ * Returns null for files we don't care about.
+ *
+ * Detection order matters:
+ *   1. "- PB.mp3" suffix  → playback-only track
+ *   2. ".mp3"             → normal audio
+ *   3. ".txt"             → lyric file
+ */
+function classifyFile(filename: string): FileType | null {
+  const lower = filename.toLowerCase();
+  if (lower.endsWith("- pb.mp3") || lower.endsWith("-pb.mp3")) return "pb";
+  if (lower.endsWith(".mp3")) return "mp3";
+  if (lower.endsWith(".txt")) return "lyrics";
+  return null;
+}
+
+/**
+ * Derive a candidate song title from a filename.
+ * Strips extension (and "- PB" suffix for playback files),
+ * then replaces hyphens/underscores with spaces and trims.
+ */
+function titleFromFilename(filename: string, type: FileType): string {
+  if (type === "pb") {
+    return filename
+      .replace(/\s*-\s*PB\.mp3$/i, "")
+      .replace(/\.mp3$/i, "")
+      .replace(/[-_]/g, " ")
+      .trim();
+  }
+  if (type === "mp3") {
+    return filename.replace(/\.mp3$/i, "").replace(/[-_]/g, " ").trim();
+  }
+  return filename.replace(/\.txt$/i, "").replace(/[-_]/g, " ").trim();
+}
+
+// ── Recursive filesystem walk ──────────────────────────────────────────────────
+
+interface RawFile {
+  filePath: string;
+  filename: string;
+}
+
+async function collectFiles(dir: string): Promise<RawFile[]> {
+  const results: RawFile[] = [];
+
+  async function walk(current: string): Promise<void> {
+    let entries;
+    try {
+      entries = await fs.readdir(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.name.startsWith(".")) continue;
+      const fullPath = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        await walk(fullPath);
+      } else if (entry.isFile()) {
+        results.push({ filePath: fullPath, filename: entry.name });
+      }
+    }
+  }
+
+  await walk(dir);
+  return results;
+}
+
+// ── Full scan ─────────────────────────────────────────────────────────────────
+
+export interface ScanResult {
+  scanned: number;
+  linked: number;
+  lyrics: number;
+  removed: number;
+}
+
+export async function fullScan(folder: string): Promise<ScanResult> {
+  if (scanInProgress) {
+    logger.warn("Scan already in progress — skipping");
+    return { scanned: 0, linked: 0, lyrics: 0, removed: 0 };
+  }
+  scanInProgress = true;
 
   try {
-    const songs = await db
+    await fs.mkdir(folder, { recursive: true });
+
+    const allFiles = await collectFiles(folder);
+    const relevantFiles = allFiles.filter(
+      (f) => classifyFile(f.filename) !== null
+    );
+
+    const allSongs = await db
       .select({ id: songsTable.id, title: songsTable.title })
       .from(songsTable);
 
-    const match = songs.find(
-      (s) => s.title.toLowerCase() === candidateTitle.toLowerCase()
+    const existingRows = await db
+      .select({ filePath: musicFilesTable.filePath })
+      .from(musicFilesTable);
+    const existingPaths = new Set(existingRows.map((r) => r.filePath));
+    const scannedPaths = new Set<string>();
+
+    let linked = 0;
+    let lyricsCount = 0;
+
+    for (const { filePath, filename } of relevantFiles) {
+      const type = classifyFile(filename)!;
+      scannedPaths.add(filePath);
+
+      let stat: { size: number; mtimeMs: number } | null = null;
+      try {
+        const s = await fs.stat(filePath);
+        stat = { size: s.size, mtimeMs: s.mtimeMs };
+      } catch {
+        continue;
+      }
+
+      const candidateTitle = titleFromFilename(filename, type);
+      const match = allSongs.find(
+        (s) => s.title.toLowerCase() === candidateTitle.toLowerCase()
+      );
+
+      const now = new Date().toISOString();
+      const record = {
+        filePath,
+        filename,
+        type,
+        songId: match?.id ?? null,
+        sizeBytes: stat.size,
+        lastModified: new Date(stat.mtimeMs).toISOString(),
+        indexedAt: now,
+      };
+
+      await db
+        .insert(musicFilesTable)
+        .values(record)
+        .onConflictDoUpdate({
+          target: musicFilesTable.filePath,
+          set: {
+            filename: record.filename,
+            type: record.type,
+            songId: record.songId,
+            sizeBytes: record.sizeBytes,
+            lastModified: record.lastModified,
+            indexedAt: record.indexedAt,
+          },
+        });
+
+      if (match) {
+        if (type === "mp3" || type === "pb") {
+          await db
+            .update(songsTable)
+            .set({ mp3Path: filePath })
+            .where(eq(songsTable.id, match.id));
+          linked++;
+          broadcast({
+            type: "music_indexed",
+            data: { songId: match.id, title: match.title, filePath },
+          });
+          logger.info(
+            { songId: match.id, title: match.title, type },
+            "Music file linked to song"
+          );
+        }
+        if (type === "lyrics") lyricsCount++;
+      }
+    }
+
+    const removedPaths = [...existingPaths].filter(
+      (p) => !scannedPaths.has(p)
     );
-
-    if (match) {
+    for (const p of removedPaths) {
       await db
-        .update(songsTable)
-        .set({ mp3Path: filePath })
-        .where(eq(songsTable.id, match.id));
-
-      broadcast({
-        type: "music_indexed",
-        data: { songId: match.id, title: match.title, filePath },
-      });
-      logger.info({ songId: match.id, title: match.title }, "Music file linked to song");
+        .delete(musicFilesTable)
+        .where(eq(musicFilesTable.filePath, p));
     }
-  } catch (err) {
-    logger.error({ err, filePath }, "Failed to index music file");
+
+    const result: ScanResult = {
+      scanned: relevantFiles.length,
+      linked,
+      lyrics: lyricsCount,
+      removed: removedPaths.length,
+    };
+    logger.info(result, "Music scan complete");
+    return result;
+  } finally {
+    scanInProgress = false;
   }
-}
-
-async function unlinkFile(filePath: string): Promise<void> {
-  try {
-    const songs = await db
-      .select({ id: songsTable.id, mp3Path: songsTable.mp3Path })
-      .from(songsTable);
-
-    const match = songs.find((s) => s.mp3Path === filePath);
-    if (match) {
-      await db
-        .update(songsTable)
-        .set({ mp3Path: null })
-        .where(eq(songsTable.id, match.id));
-      logger.info({ songId: match.id, filePath }, "Music file unlinked from song");
-    }
-  } catch (err) {
-    logger.error({ err, filePath }, "Failed to unlink music file");
-  }
-}
-
-function startWatcher(folderPath: string): void {
-  watcher = chokidar.watch(folderPath, {
-    // Ignore hidden files
-    ignored: /(^|[/\\])\../,
-    persistent: true,
-    // Index existing files on startup
-    ignoreInitial: false,
-  });
-
-  watcher
-    .on("add", (fp) => { void indexFile(fp); })
-    .on("change", (fp) => { void indexFile(fp); })
-    .on("unlink", (fp) => { void unlinkFile(fp); })
-    .on("error", (err) => { logger.error({ err }, "Music folder watcher error"); });
-
-  logger.info({ folderPath }, "Music folder watcher started");
 }
